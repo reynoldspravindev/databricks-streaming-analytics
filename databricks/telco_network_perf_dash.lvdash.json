@@ -1,0 +1,520 @@
+{
+  "pages": [
+    {
+      "name": "executive_overview",
+      "displayName": "Executive Overview",
+      "layout": [
+        {
+          "widget": {
+            "name": "total_devices_counter",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_device_count",
+                  "disaggregated": false,
+                  "fields": [
+                    {"name": "total_devices", "expression": "total_devices"}
+                  ]
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {"fieldName": "total_devices", "displayName": "Total Devices"}
+              },
+              "frame": {"title": "Total Network Devices", "showTitle": true, "showDescription": false}
+            }
+          },
+          "position": {"x": 0, "y": 0, "width": 2, "height": 2}
+        },
+        {
+          "widget": {
+            "name": "critical_devices_counter",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_critical_count",
+                  "disaggregated": false,
+                  "fields": [
+                    {"name": "critical_devices", "expression": "critical_devices"}
+                  ]
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {"fieldName": "critical_devices", "displayName": "Critical Devices"}
+              },
+              "frame": {"title": "Critical Devices", "showTitle": true, "showDescription": false}
+            }
+          },
+          "position": {"x": 2, "y": 0, "width": 2, "height": 2}
+        },
+        {
+          "widget": {
+            "name": "avg_health_counter",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_avg_health",
+                  "disaggregated": false,
+                  "fields": [
+                    {"name": "avg_health_score", "expression": "avg_health_score"}
+                  ]
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {"fieldName": "avg_health_score", "displayName": "Health Score"}
+              },
+              "frame": {"title": "Network Health Score", "showTitle": true, "showDescription": false}
+            }
+          },
+          "position": {"x": 4, "y": 0, "width": 2, "height": 2}
+        },
+        {
+          "widget": {
+            "name": "health_pie",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_health_distribution",
+                  "disaggregated": true,
+                  "fields": [
+                    {"name": "health_status", "expression": "health_status"},
+                    {"name": "count", "expression": "count"}
+                  ]
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "pie",
+              "encodings": {
+                "angle": {"fieldName": "count", "displayName": "Count"},
+                "color": {"fieldName": "health_status", "displayName": "Health Status"}
+              },
+              "frame": {"title": "Device Health Distribution", "showTitle": true, "showDescription": false}
+            }
+          },
+          "position": {"x": 0, "y": 2, "width": 3, "height": 4}
+        },
+        {
+          "widget": {
+            "name": "device_type_bar",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_device_types",
+                  "disaggregated": true,
+                  "fields": [
+                    {"name": "device_type", "expression": "device_type"},
+                    {"name": "count", "expression": "count"}
+                  ]
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {"fieldName": "device_type", "displayName": "Device Type"},
+                "y": {"fieldName": "count", "displayName": "Count"}
+              },
+              "frame": {"title": "Devices by Type", "showTitle": true, "showDescription": false}
+            }
+          },
+          "position": {"x": 3, "y": 2, "width": 3, "height": 4}
+        },
+        {
+          "widget": {
+            "name": "location_table",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_location_summary",
+                  "disaggregated": true,
+                  "fields": [
+                    {"name": "location", "expression": "location"},
+                    {"name": "devices", "expression": "devices"},
+                    {"name": "avg_health", "expression": "avg_health"},
+                    {"name": "critical_events", "expression": "critical_events"}
+                  ]
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "table",
+              "encodings": {
+                "columns": [
+                  {"fieldName": "location", "displayName": "Location"},
+                  {"fieldName": "devices", "displayName": "Devices"},
+                  {"fieldName": "avg_health", "displayName": "Avg Health"},
+                  {"fieldName": "critical_events", "displayName": "Critical Events"}
+                ]
+              },
+              "frame": {"title": "Performance by Location", "showTitle": true, "showDescription": false}
+            }
+          },
+          "position": {"x": 0, "y": 6, "width": 6, "height": 4}
+        }
+      ]
+    },
+    {
+      "name": "device_health_page",
+      "displayName": "Device Health",
+      "layout": [
+        {
+          "widget": {
+            "name": "attention_table",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_attention_devices",
+                  "disaggregated": true,
+                  "fields": [
+                    {"name": "device_id", "expression": "device_id"},
+                    {"name": "device_type", "expression": "device_type"},
+                    {"name": "location", "expression": "location"},
+                    {"name": "health_status", "expression": "health_status"},
+                    {"name": "health_score", "expression": "health_score"},
+                    {"name": "latency_ms", "expression": "latency_ms"},
+                    {"name": "packet_loss_pct", "expression": "packet_loss_pct"}
+                  ]
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "table",
+              "encodings": {
+                "columns": [
+                  {"fieldName": "device_id", "displayName": "Device ID"},
+                  {"fieldName": "device_type", "displayName": "Type"},
+                  {"fieldName": "location", "displayName": "Location"},
+                  {"fieldName": "health_status", "displayName": "Status"},
+                  {"fieldName": "health_score", "displayName": "Score"},
+                  {"fieldName": "latency_ms", "displayName": "Latency (ms)"},
+                  {"fieldName": "packet_loss_pct", "displayName": "Packet Loss %"}
+                ]
+              },
+              "frame": {"title": "Devices Requiring Attention", "showTitle": true, "showDescription": false}
+            }
+          },
+          "position": {"x": 0, "y": 0, "width": 6, "height": 6}
+        },
+        {
+          "widget": {
+            "name": "health_by_type_bar",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_type_health",
+                  "disaggregated": true,
+                  "fields": [
+                    {"name": "device_type", "expression": "device_type"},
+                    {"name": "health_status", "expression": "health_status"},
+                    {"name": "count", "expression": "count"}
+                  ]
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {"fieldName": "device_type", "displayName": "Device Type"},
+                "y": {"fieldName": "count", "displayName": "Count"},
+                "color": {"fieldName": "health_status", "displayName": "Health Status"}
+              },
+              "frame": {"title": "Health by Device Type", "showTitle": true, "showDescription": false}
+            }
+          },
+          "position": {"x": 0, "y": 6, "width": 6, "height": 4}
+        }
+      ]
+    },
+    {
+      "name": "network_perf_page",
+      "displayName": "Network Performance",
+      "layout": [
+        {
+          "widget": {
+            "name": "latency_line",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_latency_trend",
+                  "disaggregated": true,
+                  "fields": [
+                    {"name": "window_start", "expression": "window_start"},
+                    {"name": "location", "expression": "location"},
+                    {"name": "avg_latency", "expression": "avg_latency"}
+                  ]
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "line",
+              "encodings": {
+                "x": {"fieldName": "window_start", "displayName": "Time", "scale": {"type": "temporal"}},
+                "y": {"fieldName": "avg_latency", "displayName": "Avg Latency (ms)"},
+                "color": {"fieldName": "location", "displayName": "Location"}
+              },
+              "frame": {"title": "Latency Trend by Location", "showTitle": true, "showDescription": false}
+            }
+          },
+          "position": {"x": 0, "y": 0, "width": 6, "height": 4}
+        },
+        {
+          "widget": {
+            "name": "packet_loss_line",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_packet_loss_trend",
+                  "disaggregated": true,
+                  "fields": [
+                    {"name": "window_start", "expression": "window_start"},
+                    {"name": "device_type", "expression": "device_type"},
+                    {"name": "avg_packet_loss", "expression": "avg_packet_loss"}
+                  ]
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "line",
+              "encodings": {
+                "x": {"fieldName": "window_start", "displayName": "Time", "scale": {"type": "temporal"}},
+                "y": {"fieldName": "avg_packet_loss", "displayName": "Packet Loss %"},
+                "color": {"fieldName": "device_type", "displayName": "Device Type"}
+              },
+              "frame": {"title": "Packet Loss by Device Type", "showTitle": true, "showDescription": false}
+            }
+          },
+          "position": {"x": 0, "y": 4, "width": 6, "height": 4}
+        },
+        {
+          "widget": {
+            "name": "throughput_area",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_throughput_trend",
+                  "disaggregated": true,
+                  "fields": [
+                    {"name": "window_start", "expression": "window_start"},
+                    {"name": "location", "expression": "location"},
+                    {"name": "avg_throughput", "expression": "avg_throughput"}
+                  ]
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "area",
+              "encodings": {
+                "x": {"fieldName": "window_start", "displayName": "Time", "scale": {"type": "temporal"}},
+                "y": {"fieldName": "avg_throughput", "displayName": "Throughput (Mbps)"},
+                "color": {"fieldName": "location", "displayName": "Location"}
+              },
+              "frame": {"title": "Throughput by Location", "showTitle": true, "showDescription": false}
+            }
+          },
+          "position": {"x": 0, "y": 8, "width": 6, "height": 4}
+        }
+      ]
+    },
+    {
+      "name": "events_page",
+      "displayName": "Events Analysis",
+      "layout": [
+        {
+          "widget": {
+            "name": "critical_events_table",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_critical_events",
+                  "disaggregated": true,
+                  "fields": [
+                    {"name": "event_timestamp", "expression": "event_timestamp"},
+                    {"name": "device_id", "expression": "device_id"},
+                    {"name": "location", "expression": "location"},
+                    {"name": "severity_name", "expression": "severity_name"},
+                    {"name": "event_message", "expression": "event_message"}
+                  ]
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "table",
+              "encodings": {
+                "columns": [
+                  {"fieldName": "event_timestamp", "displayName": "Time"},
+                  {"fieldName": "device_id", "displayName": "Device"},
+                  {"fieldName": "location", "displayName": "Location"},
+                  {"fieldName": "severity_name", "displayName": "Severity"},
+                  {"fieldName": "event_message", "displayName": "Message"}
+                ]
+              },
+              "frame": {"title": "Recent Critical Events", "showTitle": true, "showDescription": false}
+            }
+          },
+          "position": {"x": 0, "y": 0, "width": 6, "height": 5}
+        },
+        {
+          "widget": {
+            "name": "severity_pie",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_severity_dist",
+                  "disaggregated": true,
+                  "fields": [
+                    {"name": "severity_name", "expression": "severity_name"},
+                    {"name": "count", "expression": "count"}
+                  ]
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "pie",
+              "encodings": {
+                "angle": {"fieldName": "count", "displayName": "Count"},
+                "color": {"fieldName": "severity_name", "displayName": "Severity"}
+              },
+              "frame": {"title": "Events by Severity", "showTitle": true, "showDescription": false}
+            }
+          },
+          "position": {"x": 0, "y": 5, "width": 3, "height": 4}
+        },
+        {
+          "widget": {
+            "name": "category_bar",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_category_dist",
+                  "disaggregated": true,
+                  "fields": [
+                    {"name": "event_category", "expression": "event_category"},
+                    {"name": "count", "expression": "count"}
+                  ]
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {"fieldName": "event_category", "displayName": "Category"},
+                "y": {"fieldName": "count", "displayName": "Count"}
+              },
+              "frame": {"title": "Events by Category", "showTitle": true, "showDescription": false}
+            }
+          },
+          "position": {"x": 3, "y": 5, "width": 3, "height": 4}
+        }
+      ]
+    }
+  ],
+  "datasets": [
+    {
+      "name": "ds_device_count",
+      "displayName": "Total Device Count",
+      "query": "SELECT COUNT(DISTINCT device_id) as total_devices FROM telus_networkperf.gold.gold_device_health"
+    },
+    {
+      "name": "ds_critical_count",
+      "displayName": "Critical Device Count",
+      "query": "SELECT COUNT(*) as critical_devices FROM telus_networkperf.gold.gold_device_health WHERE health_status = 'Critical'"
+    },
+    {
+      "name": "ds_avg_health",
+      "displayName": "Average Health Score",
+      "query": "SELECT ROUND(AVG(health_score), 1) as avg_health_score FROM telus_networkperf.gold.gold_device_health"
+    },
+    {
+      "name": "ds_health_distribution",
+      "displayName": "Health Status Distribution",
+      "query": "SELECT health_status, COUNT(*) as count FROM telus_networkperf.gold.gold_device_health GROUP BY health_status ORDER BY count DESC"
+    },
+    {
+      "name": "ds_device_types",
+      "displayName": "Device Type Count",
+      "query": "SELECT device_type, COUNT(*) as count FROM telus_networkperf.gold.gold_device_health GROUP BY device_type ORDER BY count DESC"
+    },
+    {
+      "name": "ds_location_summary",
+      "displayName": "Location Summary",
+      "query": "SELECT location, COUNT(*) as devices, ROUND(AVG(health_score), 1) as avg_health, SUM(critical_event_count_1h) as critical_events FROM telus_networkperf.gold.gold_device_health GROUP BY location ORDER BY avg_health ASC"
+    },
+    {
+      "name": "ds_attention_devices",
+      "displayName": "Devices Needing Attention",
+      "query": "SELECT device_id, device_type, location, health_status, health_score, current_latency_ms as latency_ms, current_packet_loss_pct as packet_loss_pct FROM telus_networkperf.gold.gold_device_health WHERE requires_attention = true OR health_status IN ('Critical', 'Poor') ORDER BY health_score ASC LIMIT 50"
+    },
+    {
+      "name": "ds_type_health",
+      "displayName": "Device Type by Health",
+      "query": "SELECT device_type, health_status, COUNT(*) as count FROM telus_networkperf.gold.gold_device_health GROUP BY device_type, health_status ORDER BY device_type, health_status"
+    },
+    {
+      "name": "ds_latency_trend",
+      "displayName": "Latency Trend",
+      "query": "SELECT window_start, location, ROUND(AVG(avg_value), 2) as avg_latency FROM telus_networkperf.gold.gold_network_performance_5min WHERE metric_name = 'latency_ms' AND window_start >= current_timestamp() - INTERVAL 6 HOURS GROUP BY window_start, location ORDER BY window_start"
+    },
+    {
+      "name": "ds_packet_loss_trend",
+      "displayName": "Packet Loss Trend",
+      "query": "SELECT window_start, device_type, ROUND(AVG(avg_value), 3) as avg_packet_loss FROM telus_networkperf.gold.gold_network_performance_5min WHERE metric_name = 'packet_loss_pct' AND window_start >= current_timestamp() - INTERVAL 6 HOURS GROUP BY window_start, device_type ORDER BY window_start"
+    },
+    {
+      "name": "ds_throughput_trend",
+      "displayName": "Throughput Trend",
+      "query": "SELECT window_start, location, ROUND(AVG(avg_value), 2) as avg_throughput FROM telus_networkperf.gold.gold_network_performance_5min WHERE metric_name = 'throughput_mbps' AND window_start >= current_timestamp() - INTERVAL 6 HOURS GROUP BY window_start, location ORDER BY window_start"
+    },
+    {
+      "name": "ds_critical_events",
+      "displayName": "Critical Events",
+      "query": "SELECT event_timestamp, device_id, location, severity_name, event_message FROM telus_networkperf.gold.gold_network_events WHERE is_critical = true AND event_timestamp >= current_timestamp() - INTERVAL 24 HOURS ORDER BY event_timestamp DESC LIMIT 100"
+    },
+    {
+      "name": "ds_severity_dist",
+      "displayName": "Severity Distribution",
+      "query": "SELECT severity_name, COUNT(*) as count FROM telus_networkperf.gold.gold_network_events WHERE event_timestamp >= current_timestamp() - INTERVAL 24 HOURS GROUP BY severity_name ORDER BY count DESC"
+    },
+    {
+      "name": "ds_category_dist",
+      "displayName": "Category Distribution",
+      "query": "SELECT event_category, COUNT(*) as count FROM telus_networkperf.gold.gold_network_events WHERE event_timestamp >= current_timestamp() - INTERVAL 24 HOURS GROUP BY event_category ORDER BY count DESC"
+    }
+  ]
+}

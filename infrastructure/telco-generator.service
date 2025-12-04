@@ -1,0 +1,40 @@
+[Unit]
+Description=Telco Network Performance Data Generator
+After=network.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=telco_user
+Group=sftpusers
+WorkingDirectory=/opt/telco-generator
+Environment="PATH=/opt/telco-generator/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+
+# GCS bucket for SNMP data - UPDATE THIS WITH YOUR BUCKET NAME
+# Format: gs://bucket-name/snmp/
+Environment="GCS_SNMP_BUCKET=gs://<YOUR_GCS_BUCKET_NAME>/snmp/"
+
+# Run the data generator:
+# - Syslog goes to local SFTP directory
+# - SNMP goes to GCS bucket (JSON format)
+ExecStart=/opt/telco-generator/venv/bin/python3 /opt/telco-generator/telco_data_generator.py \
+    --syslog-dir /sftp/telco/syslog \
+    --snmp-gcs-bucket ${GCS_SNMP_BUCKET} \
+    --files-per-minute 1000 \
+    --log-level INFO
+
+# Restart policy
+Restart=always
+RestartSec=10
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=telco-generator
+
+# Resource limits
+MemoryMax=2G
+CPUQuota=200%
+
+[Install]
+WantedBy=multi-user.target
