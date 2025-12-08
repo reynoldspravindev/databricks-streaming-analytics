@@ -22,58 +22,7 @@ This demo showcases:
 
 ## Architecture
 
-```
-┌──────────────────────────────────────────────────────────────┐
-│                         GCE VM                                │
-│  ┌────────────────────────────────────────────────────────┐  │
-│  │              data_generator.py                          │  │
-│  │         (telco or retail flavor)                        │  │
-│  └────────────────────┬─────────────────┬─────────────────┘  │
-│                       │                 │                     │
-│           Events/Logs (TXT)       Metrics (JSON)             │
-│                       │                 │                     │
-│                       ▼                 ▼                     │
-│              /sftp/data/logs      GCS Bucket                 │
-│                       │          gs://bucket/metrics/        │
-└───────────────────────│─────────────────│────────────────────┘
-                        │                 │
-                        │    1000 files/minute                  
-                        ▼                 ▼
-┌─────────────────────────────────────────────────────────────┐
-│              Databricks on GCP (Unity Catalog)              │
-│                                                              │
-│  ┌─────────────┐  ┌─────────────┐                           │
-│  │ Auto Loader │  │ Auto Loader │                           │
-│  │   (SFTP)    │  │   (GCS)     │                           │
-│  │   Logs      │  │   Metrics   │                           │
-│  └──────┬──────┘  └──────┬──────┘                           │
-│         │                │                                   │
-│         ▼                ▼                                   │
-│  ┌──────────────────────────────┐                           │
-│  │          BRONZE              │                           │
-│  │  logs_raw  │  metrics_raw    │                           │
-│  └──────────────┬───────────────┘                           │
-│                 │                                            │
-│                 ▼                                            │
-│  ┌──────────────────────────────┐                           │
-│  │          SILVER              │ ← Lakeflow DLT            │
-│  │  Parsed, Validated, Enriched │ ← Expectations            │
-│  └──────────────┬───────────────┘                           │
-│                 │                                            │
-│                 ▼                                            │
-│  ┌──────────────────────────────┐                           │
-│  │           GOLD               │                           │
-│  │  Aggregations, KPIs, Health  │ → Metric Views            │
-│  └──────────────────────────────┘                           │
-└─────────────────────────────────────────────────────────────┘
-                        │
-                        │ Delta Share (Future)
-                        ▼
-              ┌─────────────────┐
-              │  AWS Databricks │
-              │   Cross-Cloud   │
-              └─────────────────┘
-```
+![Architecture Diagram](docs/images/ReadmeMainFlow.png)
 
 ## Repository Structure
 
