@@ -118,7 +118,7 @@ snmp_query = (
     .toTable(BRONZE_SNMP_TABLE)
 )
 
-print(f"✓ Started SNMP continuous ingestion stream from GCS")
+print(f"[OK] Started SNMP continuous ingestion stream from GCS")
 print(f"  Source: {SNMP_GCS_PATH}")
 print(f"  Writing to: {BRONZE_SNMP_TABLE}")
 print(f"  Checkpoint: {SNMP_CHECKPOINT}")
@@ -194,7 +194,7 @@ except Exception as e:
 # MAGIC %md
 # MAGIC ## Next Steps
 # MAGIC 
-# MAGIC 1. ✓ SNMP bronze ingestion started (from GCS)
+# MAGIC 1. [OK] SNMP bronze ingestion started (from GCS)
 # MAGIC 2. → Ensure `01_1_bronze_ingestion_syslog.py` is running for syslog (from SFTP)
 # MAGIC 3. → Use `01_3_bronze_monitor.py` to monitor ingestion progress
 # MAGIC 4. → Run `schema_evolution_demo.py --evolve-schema` to demonstrate schema evolution
@@ -236,7 +236,7 @@ snmp_batch = (
 )
 
 snmp_batch.awaitTermination()
-print("✓ SNMP batch ingestion complete")
+print("[OK] SNMP batch ingestion complete")
 
 snmp_count = spark.table(BRONZE_SNMP_TABLE).count()
 print(f"Total SNMP records ingested: {snmp_count:,}")

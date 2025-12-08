@@ -1,0 +1,526 @@
+-- Databricks notebook source
+-- MAGIC %md
+-- MAGIC # Retail Store Performance - AI/BI Genie Space Setup
+-- MAGIC 
+-- MAGIC This notebook provides the complete configuration for setting up a **Genie Space** for natural language querying of retail store performance data.
+-- MAGIC 
+-- MAGIC ## What is Genie?
+-- MAGIC Genie is Databricks' AI-powered assistant that enables business users to ask questions about data in natural language and receive accurate SQL-backed answers.
+-- MAGIC 
+-- MAGIC ---
+-- MAGIC 
+-- MAGIC # == Genie Space Configuration
+-- MAGIC 
+-- MAGIC ## Space Name
+-- MAGIC **Retail Store Performance Analytics**
+-- MAGIC 
+-- MAGIC ## Description
+-- MAGIC AI-powered analytics for real-time store performance monitoring, operational health, sales analysis, and incident management. Ask questions about sales, checkout wait times, conversion rates, inventory issues, and store events across your retail operations.
+
+-- COMMAND ----------
+
+-- MAGIC %md
+-- MAGIC # 📊 Data Assets to Include
+-- MAGIC 
+-- MAGIC ## Gold Tables (Add these to the Genie Space)
+-- MAGIC 
+-- MAGIC | Table | Description | Key Use Cases |
+-- MAGIC |-------|-------------|---------------|
+-- MAGIC | `retail_analytics.gold.gold_store_performance_5min` | 5-minute aggregated store metrics | Sales trends, wait time analysis, conversion tracking |
+-- MAGIC | `retail_analytics.gold.gold_store_health` | Current store health scores | Store monitoring, health dashboards, alerts |
+-- MAGIC | `retail_analytics.gold.gold_store_events` | Parsed transaction events | Incident analysis, inventory monitoring, security |
+-- MAGIC | `retail_analytics.gold.gold_metrics_by_region` | Region-aggregated metrics | Geographic performance comparison |
+-- MAGIC | `retail_analytics.gold.gold_kpi_hourly` | Hourly KPI summaries | Executive reporting, trend analysis |
+-- MAGIC 
+-- MAGIC ## Metric Views (Add these to the Genie Space)
+-- MAGIC 
+-- MAGIC | Metric View | Description | Key Measures |
+-- MAGIC |-------------|-------------|--------------|
+-- MAGIC | `retail_analytics.metrics.mv_store_performance` | Store performance metrics | Avg/Max/P95 values, Anomaly rates |
+-- MAGIC | `retail_analytics.metrics.mv_store_health` | Store health metrics | Health scores, Critical store counts |
+-- MAGIC | `retail_analytics.metrics.mv_store_events` | Event analysis metrics | Event counts, Critical event rates |
+-- MAGIC | `retail_analytics.metrics.mv_regional_performance` | Regional metrics | Regional comparisons |
+-- MAGIC | `retail_analytics.metrics.mv_kpi_dashboard` | Dashboard KPIs | Hourly summaries |
+
+-- COMMAND ----------
+
+-- MAGIC %md
+-- MAGIC # == Genie Space Instructions
+-- MAGIC 
+-- MAGIC **Copy and paste the following into the Genie Space "General Instructions" section:**
+-- MAGIC 
+-- MAGIC ---
+-- MAGIC 
+-- MAGIC ## About This Data
+-- MAGIC 
+-- MAGIC This Genie space provides access to **Retail Store Performance** data from a retail company's store operations. The data includes:
+-- MAGIC 
+-- MAGIC - **Store metrics**: Operational measurements from stores (sales, wait times, conversion, inventory)
+-- MAGIC - **Transaction events**: POS events, payment issues, inventory alerts, security events
+-- MAGIC - **Store health**: Real-time health scores and status for all retail locations
+-- MAGIC 
+-- MAGIC ## Key Metrics Explained
+-- MAGIC 
+-- MAGIC | Metric | Description | Good Values | Concerning Values |
+-- MAGIC |--------|-------------|-------------|-------------------|
+-- MAGIC | **Hourly Sales ($)** | Revenue per hour | Varies by store | Sudden drops |
+-- MAGIC | **Transactions/Hour** | Number of completed sales | Varies by store | Below average |
+-- MAGIC | **Avg Basket Size ($)** | Average transaction value | > $50 | < $20 |
+-- MAGIC | **Checkout Wait Time (sec)** | Customer wait time | < 120 sec | > 300 sec |
+-- MAGIC | **Conversion Rate (%)** | Visitors who purchase | > 25% | < 10% |
+-- MAGIC | **Return Rate (%)** | Product returns | < 5% | > 12% |
+-- MAGIC | **Health Score** | Overall store health (0-100) | > 80 | < 50 |
+-- MAGIC 
+-- MAGIC ## Store Types
+-- MAGIC 
+-- MAGIC - **flagship**: Large full-experience stores
+-- MAGIC - **mall**: Shopping mall locations
+-- MAGIC - **outlet**: Discount outlet stores
+-- MAGIC - **express**: Small convenience locations
+-- MAGIC - **warehouse**: Large warehouse stores
+-- MAGIC 
+-- MAGIC ## Regions
+-- MAGIC 
+-- MAGIC Stores are distributed across: West Coast, East Coast, Midwest, Southeast, Northeast, Southwest
+-- MAGIC 
+-- MAGIC ## Event Categories
+-- MAGIC 
+-- MAGIC | Category | Description |
+-- MAGIC |----------|-------------|
+-- MAGIC | **sales** | Completed transactions |
+-- MAGIC | **checkout_issue** | Payment declines, POS errors, timeouts |
+-- MAGIC | **returns** | Product refunds |
+-- MAGIC | **inventory** | Stock alerts, stockouts |
+-- MAGIC | **security** | Theft alerts, suspicious activity |
+-- MAGIC | **loyalty** | Loyalty program events |
+-- MAGIC 
+-- MAGIC ## Severity Levels (for Events)
+-- MAGIC 
+-- MAGIC | Level | Name | Description |
+-- MAGIC |-------|------|-------------|
+-- MAGIC | 0 | Emergency | Store unusable |
+-- MAGIC | 1 | Alert | Immediate action needed |
+-- MAGIC | 2 | Critical | Critical conditions |
+-- MAGIC | 3 | Error | Error conditions |
+-- MAGIC | 4 | Warning | Warning conditions |
+-- MAGIC | 5 | Notice | Normal but significant |
+-- MAGIC | 6 | Informational | Informational messages |
+-- MAGIC | 7 | Debug | Debug-level messages |
+-- MAGIC 
+-- MAGIC **Critical events** = Severity 0-3
+-- MAGIC 
+-- MAGIC ## How to Answer Questions
+-- MAGIC 
+-- MAGIC 1. **For metric views**: Always use the `MEASURE()` function to aggregate measures
+-- MAGIC 2. **For time-based queries**: Use `window_start` and `window_end` columns
+-- MAGIC 3. **For current status**: Use `gold_store_health` table
+-- MAGIC 4. **For historical analysis**: Use `gold_store_performance_5min` or `gold_kpi_hourly`
+-- MAGIC 5. **For incidents**: Use `gold_store_events` table
+-- MAGIC 
+-- MAGIC ## Query Patterns
+-- MAGIC 
+-- MAGIC ### Using Metric Views (Preferred for Aggregations)
+-- MAGIC ```sql
+-- MAGIC SELECT
+-- MAGIC   `Dimension Name`,
+-- MAGIC   MEASURE(`Measure Name`)
+-- MAGIC FROM metric_view_name
+-- MAGIC GROUP BY `Dimension Name`
+-- MAGIC ```
+-- MAGIC 
+-- MAGIC ### Direct Table Queries
+-- MAGIC ```sql
+-- MAGIC SELECT columns FROM gold_table WHERE conditions
+-- MAGIC ```
+
+-- COMMAND ----------
+
+-- MAGIC %md
+-- MAGIC # 💬 Sample Questions for Genie
+-- MAGIC 
+-- MAGIC **Add these as "Sample Questions" in the Genie Space configuration:**
+-- MAGIC 
+-- MAGIC ## Sales & Revenue Questions
+-- MAGIC 
+-- MAGIC 1. **"What are total sales by region today?"**
+-- MAGIC 2. **"Which stores have the highest hourly sales?"**
+-- MAGIC 3. **"What is the average basket size by store type?"**
+-- MAGIC 4. **"Show me the sales trend for the last 24 hours"**
+-- MAGIC 5. **"Compare sales between flagship and outlet stores"**
+-- MAGIC 
+-- MAGIC ## Customer Experience Questions
+-- MAGIC 
+-- MAGIC 6. **"Which stores have the longest checkout wait times?"**
+-- MAGIC 7. **"What is the average wait time by region?"**
+-- MAGIC 8. **"Show stores with wait times over 5 minutes"**
+-- MAGIC 9. **"What is the conversion rate by store type?"**
+-- MAGIC 10. **"Which region has the best conversion rate?"**
+-- MAGIC 
+-- MAGIC ## Store Health Questions
+-- MAGIC 
+-- MAGIC 11. **"How many stores are in critical health status?"**
+-- MAGIC 12. **"List all stores that require attention"**
+-- MAGIC 13. **"What is the average health score by region?"**
+-- MAGIC 14. **"Show the 5 stores with lowest health scores"**
+-- MAGIC 15. **"Which store types have the most issues?"**
+-- MAGIC 
+-- MAGIC ## Inventory & Operations Questions
+-- MAGIC 
+-- MAGIC 16. **"How many stockout events occurred today?"**
+-- MAGIC 17. **"Which stores have inventory issues?"**
+-- MAGIC 18. **"What is the return rate by region?"**
+-- MAGIC 19. **"Show stores with return rates above 10%"**
+-- MAGIC 
+-- MAGIC ## Event & Incident Questions
+-- MAGIC 
+-- MAGIC 20. **"How many critical events occurred today?"**
+-- MAGIC 21. **"Show me all payment declined events"**
+-- MAGIC 22. **"Which stores had the most POS errors?"**
+-- MAGIC 23. **"Show security events from the last hour"**
+-- MAGIC 24. **"What are the most common event types?"**
+-- MAGIC 
+-- MAGIC ## Regional Questions
+-- MAGIC 
+-- MAGIC 25. **"Which region has the best store performance?"**
+-- MAGIC 26. **"Compare all KPIs between West Coast and East Coast"**
+-- MAGIC 27. **"How many stores are in each region?"**
+-- MAGIC 28. **"Show the top performing region by sales"**
+
+-- COMMAND ----------
+
+-- MAGIC %md
+-- MAGIC # 🔧 Table-Specific Instructions
+-- MAGIC 
+-- MAGIC **Add these as "Table Instructions" for each table in the Genie Space:**
+-- MAGIC 
+-- MAGIC ---
+-- MAGIC 
+-- MAGIC ## gold_store_performance_5min
+-- MAGIC 
+-- MAGIC **Instructions:**
+-- MAGIC ```
+-- MAGIC This table contains 5-minute aggregated operational metrics from retail stores.
+-- MAGIC 
+-- MAGIC Key columns:
+-- MAGIC - window_start, window_end: Time window for aggregation
+-- MAGIC - store_id, store_type, region, brand, district: Store identification
+-- MAGIC - metric_name: Type of metric (hourly_sales, transactions_per_hour, avg_basket_size, checkout_wait_time_sec, conversion_rate_pct, return_rate_pct, customer_traffic, staff_productivity)
+-- MAGIC - avg_value, max_value, min_value: Aggregated values
+-- MAGIC - p50_value, p95_value, p99_value: Percentile values
+-- MAGIC - sample_count: Number of samples in window
+-- MAGIC - anomaly_count: Number of anomalous readings
+-- MAGIC 
+-- MAGIC Use this table for:
+-- MAGIC - Trend analysis over time
+-- MAGIC - Performance comparisons between stores/regions
+-- MAGIC - Anomaly detection
+-- MAGIC - Operational monitoring
+-- MAGIC 
+-- MAGIC Always filter by metric_name when querying specific metrics.
+-- MAGIC ```
+-- MAGIC 
+-- MAGIC ---
+-- MAGIC 
+-- MAGIC ## gold_store_health
+-- MAGIC 
+-- MAGIC **Instructions:**
+-- MAGIC ```
+-- MAGIC This table contains current health status for all retail stores.
+-- MAGIC 
+-- MAGIC Key columns:
+-- MAGIC - store_id, store_type, region: Store identification
+-- MAGIC - health_score: 0-100 score (higher is better)
+-- MAGIC - health_status: Excellent (>90), Good (75-90), Fair (50-74), Poor (25-49), Critical (<25)
+-- MAGIC - current_hourly_sales, current_transactions, current_basket_size: Latest sales metrics
+-- MAGIC - current_wait_time_sec, current_conversion_pct, current_return_rate_pct: Latest operational metrics
+-- MAGIC - event_count_1h, critical_event_count_1h: Recent event counts
+-- MAGIC - inventory_issues_1h, checkout_issues_1h, security_issues_1h: Issue counts
+-- MAGIC - requires_attention: Boolean flag for stores needing action
+-- MAGIC 
+-- MAGIC Use this table for:
+-- MAGIC - Real-time store monitoring
+-- MAGIC - Identifying problematic stores
+-- MAGIC - Health dashboards
+-- MAGIC - Alerting on store status
+-- MAGIC 
+-- MAGIC Filter by health_status or requires_attention to find problem stores.
+-- MAGIC ```
+-- MAGIC 
+-- MAGIC ---
+-- MAGIC 
+-- MAGIC ## gold_store_events
+-- MAGIC 
+-- MAGIC **Instructions:**
+-- MAGIC ```
+-- MAGIC This table contains parsed transaction and operational events from stores.
+-- MAGIC 
+-- MAGIC Key columns:
+-- MAGIC - event_timestamp: When the event occurred
+-- MAGIC - store_id, region: Store identification
+-- MAGIC - event_type: TRANSACTION, PAYMENT_DECLINED, REFUND, INVENTORY_LOW, STOCKOUT, THEFT_ALERT, POS_ERROR, etc.
+-- MAGIC - event_category: sales, checkout_issue, returns, inventory, security, loyalty
+-- MAGIC - severity: Numeric 0-7 (0=Emergency, 7=Debug)
+-- MAGIC - severity_name: Human-readable severity
+-- MAGIC - is_critical: True for severity 0-3
+-- MAGIC - event_message: Full event description
+-- MAGIC 
+-- MAGIC Use this table for:
+-- MAGIC - Incident investigation
+-- MAGIC - Operations monitoring
+-- MAGIC - Inventory tracking
+-- MAGIC - Security analysis
+-- MAGIC 
+-- MAGIC Filter by is_critical=true for important events.
+-- MAGIC Filter by event_category for specific event types.
+-- MAGIC ```
+-- MAGIC 
+-- MAGIC ---
+-- MAGIC 
+-- MAGIC ## gold_metrics_by_region
+-- MAGIC 
+-- MAGIC **Instructions:**
+-- MAGIC ```
+-- MAGIC This table aggregates metrics by geographic region.
+-- MAGIC 
+-- MAGIC Key columns:
+-- MAGIC - window_start, window_end: Time window
+-- MAGIC - region: Geographic region
+-- MAGIC - metric_name: Type of metric
+-- MAGIC - store_count: Number of stores at region
+-- MAGIC - region_avg_value, region_max_value, region_min_value, region_p95_value: Region aggregates
+-- MAGIC - total_anomalies, total_samples: For anomaly rate calculation
+-- MAGIC 
+-- MAGIC Use this table for:
+-- MAGIC - Geographic comparisons
+-- MAGIC - Regional performance analysis
+-- MAGIC - Capacity planning by region
+-- MAGIC 
+-- MAGIC Group by region for comparisons. Filter by metric_name for specific metrics.
+-- MAGIC ```
+-- MAGIC 
+-- MAGIC ---
+-- MAGIC 
+-- MAGIC ## gold_kpi_hourly
+-- MAGIC 
+-- MAGIC **Instructions:**
+-- MAGIC ```
+-- MAGIC This table contains hourly KPI summaries for executive reporting.
+-- MAGIC 
+-- MAGIC Key columns:
+-- MAGIC - hour_start: Start of the hour
+-- MAGIC - metric_name: Type of metric
+-- MAGIC - store_count: Stores reporting
+-- MAGIC - hourly_avg, hourly_max, hourly_p95: Hourly aggregates
+-- MAGIC - hourly_anomalies: Anomalies detected in hour
+-- MAGIC - total_events, critical_events, affected_stores: Event summaries
+-- MAGIC 
+-- MAGIC Use this table for:
+-- MAGIC - Executive dashboards
+-- MAGIC - Hourly trend analysis
+-- MAGIC - KPI reporting
+-- MAGIC - High-level summaries
+-- MAGIC 
+-- MAGIC Use ORDER BY hour_start for time-series analysis.
+-- MAGIC ```
+
+-- COMMAND ----------
+
+-- MAGIC %md
+-- MAGIC # 📋 Metric View Instructions
+-- MAGIC 
+-- MAGIC ---
+-- MAGIC 
+-- MAGIC ## mv_store_performance
+-- MAGIC 
+-- MAGIC **Instructions:**
+-- MAGIC ```
+-- MAGIC Metric view for store operational performance analysis.
+-- MAGIC 
+-- MAGIC IMPORTANT: Always use MEASURE() function for measures!
+-- MAGIC 
+-- MAGIC Available Dimensions (for GROUP BY):
+-- MAGIC - Time Window Start, Time Window End
+-- MAGIC - Store ID, Store Type, Region, Brand, District
+-- MAGIC - Metric Name, Metric Unit
+-- MAGIC 
+-- MAGIC Available Measures (use with MEASURE()):
+-- MAGIC - Average Value, Max Value, Min Value
+-- MAGIC - P50 Value, P95 Value, P99 Value
+-- MAGIC - Total Samples, Anomaly Count, Anomaly Rate
+-- MAGIC - Store Count
+-- MAGIC 
+-- MAGIC Example query:
+-- MAGIC SELECT `Region`, MEASURE(`Average Value`), MEASURE(`Anomaly Rate`)
+-- MAGIC FROM mv_store_performance
+-- MAGIC WHERE `Metric Name` = 'hourly_sales'
+-- MAGIC GROUP BY `Region`
+-- MAGIC ```
+-- MAGIC 
+-- MAGIC ---
+-- MAGIC 
+-- MAGIC ## mv_store_health
+-- MAGIC 
+-- MAGIC **Instructions:**
+-- MAGIC ```
+-- MAGIC Metric view for store health analysis.
+-- MAGIC 
+-- MAGIC IMPORTANT: Always use MEASURE() function for measures!
+-- MAGIC 
+-- MAGIC Available Dimensions:
+-- MAGIC - Store ID, Store Type, Region
+-- MAGIC - Health Status, Requires Attention
+-- MAGIC 
+-- MAGIC Available Measures:
+-- MAGIC - Store Count, Average Health Score, Min Health Score
+-- MAGIC - Avg Hourly Sales, Avg Wait Time (sec), Avg Conversion Rate, Avg Return Rate
+-- MAGIC - Total Events (1h), Critical Events (1h), Inventory Issues (1h)
+-- MAGIC - Stores Needing Attention, Critical Store Count
+-- MAGIC 
+-- MAGIC Example query:
+-- MAGIC SELECT `Health Status`, MEASURE(`Store Count`), MEASURE(`Average Health Score`)
+-- MAGIC FROM mv_store_health
+-- MAGIC GROUP BY `Health Status`
+-- MAGIC ```
+-- MAGIC 
+-- MAGIC ---
+-- MAGIC 
+-- MAGIC ## mv_store_events
+-- MAGIC 
+-- MAGIC **Instructions:**
+-- MAGIC ```
+-- MAGIC Metric view for store event analysis.
+-- MAGIC 
+-- MAGIC IMPORTANT: Always use MEASURE() function for measures!
+-- MAGIC 
+-- MAGIC Available Dimensions:
+-- MAGIC - Event Timestamp, Store ID, Region
+-- MAGIC - Event Type, Event Category
+-- MAGIC - Severity, Severity Name, Is Critical
+-- MAGIC - Hour of Day, Day of Week
+-- MAGIC 
+-- MAGIC Available Measures:
+-- MAGIC - Event Count, Critical Event Count, Critical Event Rate
+-- MAGIC - Affected Store Count, Average Event Age (min)
+-- MAGIC 
+-- MAGIC Example query:
+-- MAGIC SELECT `Event Category`, MEASURE(`Event Count`), MEASURE(`Critical Event Rate`)
+-- MAGIC FROM mv_store_events
+-- MAGIC GROUP BY `Event Category`
+-- MAGIC ```
+
+-- COMMAND ----------
+
+-- MAGIC %md
+-- MAGIC # == Step-by-Step Genie Space Creation
+-- MAGIC 
+-- MAGIC ## Step 1: Navigate to Genie
+-- MAGIC 1. In Databricks workspace, click **"New"** in the sidebar
+-- MAGIC 2. Select **"Genie space"**
+-- MAGIC 
+-- MAGIC ## Step 2: Basic Configuration
+-- MAGIC 1. **Name**: `Retail Store Performance Analytics`
+-- MAGIC 2. **Description**: `AI-powered analytics for retail store performance, sales analysis, and operational monitoring.`
+-- MAGIC 
+-- MAGIC ## Step 3: Add Data Assets
+-- MAGIC Click **"Add tables"** and add these tables from `retail_analytics`:
+-- MAGIC 
+-- MAGIC **Gold Tables:**
+-- MAGIC - `retail_analytics.gold.gold_store_performance_5min`
+-- MAGIC - `retail_analytics.gold.gold_store_health`
+-- MAGIC - `retail_analytics.gold.gold_store_events`
+-- MAGIC - `retail_analytics.gold.gold_metrics_by_region`
+-- MAGIC - `retail_analytics.gold.gold_kpi_hourly`
+-- MAGIC 
+-- MAGIC **Metric Views:**
+-- MAGIC - `retail_analytics.metrics.mv_store_performance`
+-- MAGIC - `retail_analytics.metrics.mv_store_health`
+-- MAGIC - `retail_analytics.metrics.mv_store_events`
+-- MAGIC - `retail_analytics.metrics.mv_regional_performance`
+-- MAGIC - `retail_analytics.metrics.mv_kpi_dashboard`
+-- MAGIC 
+-- MAGIC ## Step 4: Configure General Instructions
+-- MAGIC Copy the full instructions from the **"Genie Space Instructions"** section above.
+-- MAGIC 
+-- MAGIC ## Step 5: Add Table-Specific Instructions
+-- MAGIC For each table/view:
+-- MAGIC 1. Click on the table name
+-- MAGIC 2. Click **"Add instructions"**
+-- MAGIC 3. Paste the corresponding instructions from **"Table-Specific Instructions"** section
+-- MAGIC 
+-- MAGIC ## Step 6: Add Sample Questions
+-- MAGIC Add 5-10 sample questions from the list above, such as:
+-- MAGIC - What are total sales by region today?
+-- MAGIC - Which stores have the longest checkout wait times?
+-- MAGIC - How many stores are in critical health status?
+-- MAGIC - Show me all payment declined events today
+-- MAGIC - Which region has the best store performance?
+-- MAGIC 
+-- MAGIC ## Step 7: Configure SQL Warehouse
+-- MAGIC 1. Select an appropriate **SQL Warehouse** (Serverless recommended)
+-- MAGIC 2. Ensure warehouse is running **Databricks Runtime 17.2+** for metric views
+-- MAGIC 
+-- MAGIC ## Step 8: Save and Share
+-- MAGIC 1. Click **"Save"**
+-- MAGIC 2. Share with relevant users/groups
+-- MAGIC 3. Grant appropriate permissions
+
+-- COMMAND ----------
+
+-- MAGIC %md
+-- MAGIC # == Verification Queries
+-- MAGIC 
+-- MAGIC Run these queries to verify data is available for Genie:
+
+-- COMMAND ----------
+
+-- Check gold tables exist and have data
+SELECT 'gold_store_performance_5min' as table_name, COUNT(*) as row_count FROM retail_analytics.gold.gold_store_performance_5min
+UNION ALL
+SELECT 'gold_store_health', COUNT(*) FROM retail_analytics.gold.gold_store_health
+UNION ALL
+SELECT 'gold_store_events', COUNT(*) FROM retail_analytics.gold.gold_store_events
+UNION ALL
+SELECT 'gold_metrics_by_region', COUNT(*) FROM retail_analytics.gold.gold_metrics_by_region
+UNION ALL
+SELECT 'gold_kpi_hourly', COUNT(*) FROM retail_analytics.gold.gold_kpi_hourly;
+
+-- COMMAND ----------
+
+-- Check metric views exist
+SHOW VIEWS IN retail_analytics.metrics;
+
+-- COMMAND ----------
+
+-- Test a metric view query (what Genie would generate)
+SELECT
+  `Region`,
+  MEASURE(`Average Value`) as avg_sales,
+  MEASURE(`Store Count`) as stores,
+  MEASURE(`Anomaly Rate`) as anomaly_pct
+FROM retail_analytics.metrics.mv_store_performance
+WHERE `Metric Name` = 'hourly_sales'
+GROUP BY `Region`
+ORDER BY avg_sales DESC;
+
+-- COMMAND ----------
+
+-- Test store health metric view
+SELECT
+  `Health Status`,
+  MEASURE(`Store Count`) as stores,
+  MEASURE(`Average Health Score`) as avg_score,
+  MEASURE(`Stores Needing Attention`) as needs_attention
+FROM retail_analytics.metrics.mv_store_health
+GROUP BY `Health Status`
+ORDER BY avg_score ASC;
+
+-- COMMAND ----------
+
+-- MAGIC %md
+-- MAGIC # 📚 Reference Links
+-- MAGIC 
+-- MAGIC - [AI/BI Genie Documentation](https://docs.databricks.com/gcp/en/genie/)
+-- MAGIC - [Use Metric Views with Genie](https://docs.databricks.com/gcp/en/metric-views/consume/genie.html)
+-- MAGIC - [Create a Genie Space](https://docs.databricks.com/gcp/en/genie/create-genie-space.html)
+-- MAGIC - [Metric Views Overview](https://docs.databricks.com/gcp/en/metric-views/)
+

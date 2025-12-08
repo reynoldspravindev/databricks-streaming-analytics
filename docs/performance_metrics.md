@@ -2,7 +2,7 @@
 
 ## Executive Summary
 
-This document compares performance metrics between **Databricks on GCP** and the **GCP native ETL stack** (Cloud Composer + Dataflow + BigQuery) for telco network performance monitoring.
+This document compares performance metrics between **Databricks on GCP** and the **GCP native ETL stack** (Cloud Composer + Dataflow + BigQuery) for real-time performance monitoring use cases.
 
 ### Key Performance Results
 
@@ -21,10 +21,10 @@ This document compares performance metrics between **Databricks on GCP** and the
 ### Test Environment
 
 **Data Characteristics:**
-- **Volume**: 1,000 files/minute (500 syslog, 500 SNMP)
+- **Volume**: 1,000 files/minute (500 logs, 500 metrics)
 - **File Size**: 10-50 KB per file
 - **Daily Volume**: 150 GB/day
-- **Devices**: 100 simulated network devices
+- **Entities**: 100 simulated entities (devices, stores, etc.)
 - **Duration**: 7-day continuous test
 
 **Infrastructure:**
@@ -50,7 +50,7 @@ This document compares performance metrics between **Databricks on GCP** and the
 ## 1. End-to-End Latency
 
 ### Definition
-Time from **file landing on SFTP** to **data queryable in gold layer**.
+Time from **file landing on SFTP/GCS** to **data queryable in gold layer**.
 
 ### Test Results
 
@@ -68,39 +68,39 @@ Time from **file landing on SFTP** to **data queryable in gold layer**.
 #### GCP Native Stack Latency
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│ File Lands on SFTP                                          │
-└─────────────┬───────────────────────────────────────────────┘
-              │
-              ▼ 1-2 min (Composer DAG trigger)
-┌─────────────────────────────────────────────────────────────┐
-│ Cloud Composer detects new files                            │
-└─────────────┬───────────────────────────────────────────────┘
-              │
-              ▼ 5-8 min (Dataflow job startup + processing)
-┌─────────────────────────────────────────────────────────────┐
-│ Dataflow ingests to Cloud Storage                           │
-└─────────────┬───────────────────────────────────────────────┘
-              │
-              ▼ 2-4 min (BigQuery LOAD job)
-┌─────────────────────────────────────────────────────────────┐
-│ BigQuery loads raw data                                     │
-└─────────────┬───────────────────────────────────────────────┘
-              │
-              ▼ 6-10 min (Dataflow transformation)
-┌─────────────────────────────────────────────────────────────┐
-│ Dataflow transforms to silver layer                         │
-└─────────────┬───────────────────────────────────────────────┘
-              │
-              ▼ 3-5 min (BigQuery aggregation query)
-┌─────────────────────────────────────────────────────────────┐
-│ BigQuery creates gold aggregations                          │
-└─────────────┬───────────────────────────────────────────────┘
-              │
-              ▼ 0-5 min (Scheduled view refresh)
-┌─────────────────────────────────────────────────────────────┐
-│ Materialized views refresh                                  │
-└─────────────────────────────────────────────────────────────┘
++-------------------------------------------------------------+
+| File Lands on SFTP/GCS                                       |
++-------------+-----------------------------------------------+
+              |
+              v 1-2 min (Composer DAG trigger)
++-------------------------------------------------------------+
+| Cloud Composer detects new files                             |
++-------------+-----------------------------------------------+
+              |
+              v 5-8 min (Dataflow job startup + processing)
++-------------------------------------------------------------+
+| Dataflow ingests to Cloud Storage                            |
++-------------+-----------------------------------------------+
+              |
+              v 2-4 min (BigQuery LOAD job)
++-------------------------------------------------------------+
+| BigQuery loads raw data                                      |
++-------------+-----------------------------------------------+
+              |
+              v 6-10 min (Dataflow transformation)
++-------------------------------------------------------------+
+| Dataflow transforms to silver layer                          |
++-------------+-----------------------------------------------+
+              |
+              v 3-5 min (BigQuery aggregation query)
++-------------------------------------------------------------+
+| BigQuery creates gold aggregations                           |
++-------------+-----------------------------------------------+
+              |
+              v 0-5 min (Scheduled view refresh)
++-------------------------------------------------------------+
+| Materialized views refresh                                   |
++-------------------------------------------------------------+
 
 TOTAL: 15-30 minutes
 ```
@@ -108,29 +108,29 @@ TOTAL: 15-30 minutes
 #### Databricks Latency
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│ File Lands on SFTP                                          │
-└─────────────┬───────────────────────────────────────────────┘
-              │
-              ▼ 0.1-0.3 min (Auto Loader continuous monitoring)
-┌─────────────────────────────────────────────────────────────┐
-│ Auto Loader detects and streams to Bronze                   │
-└─────────────┬───────────────────────────────────────────────┘
-              │
-              ▼ 0.5-0.8 min (DLT Silver pipeline - streaming)
-┌─────────────────────────────────────────────────────────────┐
-│ DLT transforms to Silver layer                              │
-└─────────────┬───────────────────────────────────────────────┘
-              │
-              ▼ 0.3-0.5 min (DLT Gold pipeline - triggered)
-┌─────────────────────────────────────────────────────────────┐
-│ DLT aggregates to Gold layer                                │
-└─────────────┬───────────────────────────────────────────────┘
-              │
-              ▼ < 0.1 min (Metric views - auto-refresh)
-┌─────────────────────────────────────────────────────────────┐
-│ Metric views queryable                                      │
-└─────────────────────────────────────────────────────────────┘
++-------------------------------------------------------------+
+| File Lands on SFTP/GCS                                       |
++-------------+-----------------------------------------------+
+              |
+              v 0.1-0.3 min (Auto Loader continuous monitoring)
++-------------------------------------------------------------+
+| Auto Loader detects and streams to Bronze                    |
++-------------+-----------------------------------------------+
+              |
+              v 0.5-0.8 min (DLT Silver pipeline - streaming)
++-------------------------------------------------------------+
+| DLT transforms to Silver layer                               |
++-------------+-----------------------------------------------+
+              |
+              v 0.3-0.5 min (DLT Gold pipeline - triggered)
++-------------------------------------------------------------+
+| DLT aggregates to Gold layer                                 |
++-------------+-----------------------------------------------+
+              |
+              v < 0.1 min (Metric views - auto-refresh)
++-------------------------------------------------------------+
+| Metric views queryable                                       |
++-------------------------------------------------------------+
 
 TOTAL: 1.2-2.2 minutes
 ```
@@ -139,7 +139,7 @@ TOTAL: 1.2-2.2 minutes
 
 1. **No Orchestration Overhead**: DLT pipelines run continuously, no waiting for DAG triggers
 2. **Streaming Processing**: Auto Loader streams data immediately, no batch windows
-3. **Unified Platform**: No data copying between tools (Dataflow → BigQuery)
+3. **Unified Platform**: No data copying between tools (Dataflow to BigQuery)
 4. **Optimized Delta Lake**: Faster writes and reads than BigQuery loads
 5. **Photon Engine**: 3-5x faster query execution
 
@@ -161,19 +161,19 @@ TOTAL: 1.2-2.2 minutes
 
 ```
 Files/Min
-    │
-20K │                                       ▲ Databricks
-    │                                   ▲  ▲
-    │                               ▲  ▲
-15K │                           ▲  ▲
-    │                       ▲  ▲
-    │                   ▲  ▲
-10K │               ▲  ▲              ● GCP Native (capped)
-    │           ▲  ▲   ●  ●  ●  ●  ●  ●
- 5K │       ▲  ▲  ●  ●
-    │   ▲  ▲  ●  ●
-    │▲  ▲  ●  ●
-  0 └──────────────────────────────────────────────► Time
+    |
+20K |                                       * Databricks
+    |                                   *  *
+    |                               *  *
+15K |                           *  *
+    |                       *  *
+    |                   *  *
+10K |               *  *              o GCP Native (capped)
+    |           *  *   o  o  o  o  o  o
+ 5K |       *  *  o  o
+    |   *  *  o  o
+    |*  *  o  o
+  0 +---------------------------------------------------> Time
     0   2   4   6   8  10  12  14  16  18  20
                     Hours Under Load
 ```
@@ -196,12 +196,12 @@ Files/Min
 
 ### Test: Dashboard Queries
 
-**Query 1: Real-time latency by device**
+**Query 1: Real-time metrics by entity**
 ```sql
-SELECT device_type, location, AVG(latency_ms)
-FROM network_metrics
+SELECT entity_type, location, AVG(value)
+FROM metrics
 WHERE timestamp >= CURRENT_TIMESTAMP() - INTERVAL 5 MINUTES
-GROUP BY device_type, location
+GROUP BY entity_type, location
 ```
 
 | Platform | P50 (ms) | P95 (ms) | P99 (ms) |
@@ -210,10 +210,10 @@ GROUP BY device_type, location
 | Databricks | 250 | 800 | 1,500 |
 | **Improvement** | **4.8x** | **4.4x** | **4.5x** |
 
-**Query 2: Top problem devices**
+**Query 2: Top problem entities**
 ```sql
-SELECT device_id, health_score, critical_events
-FROM device_health
+SELECT entity_id, health_score, critical_events
+FROM entity_health
 WHERE health_score < 50
 ORDER BY health_score ASC
 LIMIT 100
@@ -228,7 +228,7 @@ LIMIT 100
 **Query 3: Hourly KPI aggregation**
 ```sql
 SELECT hour, metric_name, AVG(value), MAX(value)
-FROM network_performance_5min
+FROM performance_5min
 WHERE date = CURRENT_DATE()
 GROUP BY hour, metric_name
 ```
@@ -337,7 +337,7 @@ GROUP BY hour, metric_name
 | Task | GCP Native (hours) | Databricks (hours) | Speedup |
 |------|--------------------|--------------------|---------|
 | Add new metric | 8 (update 4 pipelines) | 2 (add to DLT) | 4x |
-| Schema evolution | 4 (manual DDL) | 0 (automatic) | ∞ |
+| Schema evolution | 4 (manual DDL) | 0 (automatic) | N/A |
 | New dashboard | 6 (Looker + data model) | 2 (SQL + viz) | 3x |
 | Fix pipeline failure | 2 (investigate + restart) | 0.2 (auto-retry) | 10x |
 | Data quality check | 4 (custom code) | 1 (expectations) | 4x |
@@ -360,18 +360,18 @@ GROUP BY hour, metric_name
 
 | Metric | GCP Native | Databricks | Impact |
 |--------|------------|------------|--------|
-| **Time to Detect Network Issue** | 20 minutes | 2 minutes | 10x faster |
+| **Time to Detect Issue** | 20 minutes | 2 minutes | 10x faster |
 | **Mean Time to Resolution (MTTR)** | 60 minutes | 10 minutes | 6x faster |
 | **False Positive Alerts** | 15% | 3% | 5x reduction |
-| **Prevented Outages/Month** | 2 | 5 | 2.5x more |
+| **Prevented Incidents/Month** | 2 | 5 | 2.5x more |
 | **Customer Impacting Incidents** | 12/month | 3/month | 4x reduction |
 
-### Revenue Impact (For $1B/year Telco)
+### Revenue Impact (Example: $1B/year Enterprise)
 
 | Metric | Annual Impact |
 |--------|---------------|
 | Reduced downtime (3 hours/month saved) | $1.5M |
-| Faster MTTR (50 min/incident saved × 50 incidents) | $800K |
+| Faster MTTR (50 min/incident saved x 50 incidents) | $800K |
 | Reduced customer churn (0.5% improvement) | $5M |
 | **Total Annual Value** | **$7.3M** |
 
@@ -414,7 +414,7 @@ GROUP BY hour, metric_name
 
 ```yaml
 Cloud Storage:
-  - Bucket: gs://telco-landing-zone
+  - Bucket: gs://<project>-landing-zone
   - Region: us-central1
   
 Cloud Composer:
@@ -432,7 +432,7 @@ BigQuery:
   - Pricing: On-demand
   - Region: us-central1
   - Partitioning: By date
-  - Clustering: By device_id
+  - Clustering: By entity_id
 ```
 
 ### Databricks Configuration
@@ -469,5 +469,4 @@ SQL Warehouse:
 
 - Databricks Performance Benchmarks: [TPC-DS](https://www.databricks.com/blog/2021/11/02/databricks-sets-official-data-warehousing-performance-record.html)
 - BigQuery Performance Best Practices: [Google Cloud Docs](https://cloud.google.com/bigquery/docs/best-practices-performance-overview)
-- Internal telco customer benchmarks (anonymized)
-
+- Internal customer benchmarks (anonymized)

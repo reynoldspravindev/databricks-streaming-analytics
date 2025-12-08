@@ -1,18 +1,18 @@
 # Databricks notebook source
 # MAGIC %md
-# MAGIC # Telco Network Performance Demo - Bronze Syslog Ingestion
+# MAGIC # Retail Store Performance Demo - Bronze Events Ingestion
 # MAGIC 
-# MAGIC This notebook implements Auto Loader for ingesting syslog data from the SFTP server.
+# MAGIC This notebook implements Auto Loader for ingesting transaction/event logs from the SFTP server.
 # MAGIC 
 # MAGIC ## Features
 # MAGIC - Real-time streaming ingestion using Auto Loader
-# MAGIC - RFC 5424 syslog format support
+# MAGIC - RFC 5424 event log format support
 # MAGIC - Exactly-once processing guarantees
 # MAGIC - Metadata tracking for lineage
 # MAGIC 
 # MAGIC ## Architecture
 # MAGIC ```
-# MAGIC SFTP Server (syslog/*.txt) → Auto Loader → Bronze Delta Table
+# MAGIC SFTP Server (events/*.txt) → Auto Loader → Bronze Delta Table
 # MAGIC ```
 
 # COMMAND ----------
@@ -23,7 +23,6 @@
 # COMMAND ----------
 
 from pyspark.sql.functions import current_timestamp, col
-from pyspark.sql.types import *
 
 # SFTP connection details
 SFTP_HOST = dbutils.secrets.get(scope="<YOUR_SECRET_SCOPE>", key="SFTP_HOST")
@@ -31,75 +30,75 @@ SFTP_USERNAME = dbutils.secrets.get(scope="<YOUR_SECRET_SCOPE>", key="SFTP_USERN
 SFTP_PORT = "22"
 
 # Unity Catalog configuration
-CATALOG_NAME = "telus_networkperf"
+CATALOG_NAME = "retail_analytics"
 SCHEMA_NAME = "bronze"
 
 # Table name
-BRONZE_SYSLOG_TABLE = f"{CATALOG_NAME}.{SCHEMA_NAME}.syslog_raw"
+BRONZE_EVENTS_TABLE = f"{CATALOG_NAME}.{SCHEMA_NAME}.events_raw"
 
 # SFTP path (relative to chroot - /sftp is the root for SFTP user)
-SYSLOG_SFTP_PATH = f"sftp://{SFTP_USERNAME}@{SFTP_HOST}:{SFTP_PORT}/telco/syslog/"
+EVENTS_SFTP_PATH = f"sftp://{SFTP_USERNAME}@{SFTP_HOST}:{SFTP_PORT}/retail/events/"
 
 # Checkpoint and schema locations (use Unity Catalog volume paths)
 CHECKPOINT_BASE = f"/Volumes/{CATALOG_NAME}/{SCHEMA_NAME}/checkpoints"
 SCHEMA_BASE = f"/Volumes/{CATALOG_NAME}/{SCHEMA_NAME}/schemas"
 
-SYSLOG_CHECKPOINT = f"{CHECKPOINT_BASE}/syslog"
-SYSLOG_SCHEMA_LOCATION = f"{SCHEMA_BASE}/syslog"
+EVENTS_CHECKPOINT = f"{CHECKPOINT_BASE}/events"
+EVENTS_SCHEMA_LOCATION = f"{SCHEMA_BASE}/events"
 
-print("Syslog Ingestion Configuration:")
-print(f"  SFTP Path: {SYSLOG_SFTP_PATH}")
-print(f"  Target Table: {BRONZE_SYSLOG_TABLE}")
-print(f"  Checkpoint: {SYSLOG_CHECKPOINT}")
-print(f"  Schema Location: {SYSLOG_SCHEMA_LOCATION}")
+print("Retail Events Ingestion Configuration:")
+print(f"  SFTP Path: {EVENTS_SFTP_PATH}")
+print(f"  Target Table: {BRONZE_EVENTS_TABLE}")
+print(f"  Checkpoint: {EVENTS_CHECKPOINT}")
+print(f"  Schema Location: {EVENTS_SCHEMA_LOCATION}")
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Bronze Syslog Ingestion
+# MAGIC ## Bronze Events Ingestion
 # MAGIC 
-# MAGIC Ingest RFC 5424 syslog text files from SFTP server using Auto Loader.
+# MAGIC Ingest RFC 5424 transaction event logs from SFTP server using Auto Loader.
 
 # COMMAND ----------
 
-syslog_stream = (
+events_stream = (
     spark.readStream
     .format("cloudFiles")
     .option("cloudFiles.format", "text")
-    .option("cloudFiles.schemaLocation", SYSLOG_SCHEMA_LOCATION)
+    .option("cloudFiles.schemaLocation", EVENTS_SCHEMA_LOCATION)
     .option("cloudFiles.includeExistingFiles", "true")
     .option("pathGlobFilter", "*.txt")
-    .load(SYSLOG_SFTP_PATH)
+    .load(EVENTS_SFTP_PATH)
     .withColumn("ingestion_timestamp", current_timestamp())
     .withColumn("source_file", col("_metadata.file_path"))
 )
 
 # Display schema
-print("Syslog Stream Schema:")
-syslog_stream.printSchema()
+print("Events Stream Schema:")
+events_stream.printSchema()
 
 # COMMAND ----------
 
-# Write syslog stream to bronze table (CONTINUOUS MODE)
-syslog_query = (
-    syslog_stream.writeStream
+# Write events stream to bronze table (CONTINUOUS MODE)
+events_query = (
+    events_stream.writeStream
     .format("delta")
-    .option("checkpointLocation", SYSLOG_CHECKPOINT)
+    .option("checkpointLocation", EVENTS_CHECKPOINT)
     .option("mergeSchema", "true")
     .outputMode("append")
     .trigger(processingTime="5 seconds")
-    .toTable(BRONZE_SYSLOG_TABLE)
+    .toTable(BRONZE_EVENTS_TABLE)
 )
 
-print(f"[OK] Started syslog continuous ingestion stream")
-print(f"  Writing to: {BRONZE_SYSLOG_TABLE}")
-print(f"  Checkpoint: {SYSLOG_CHECKPOINT}")
+print(f"[OK] Started events continuous ingestion stream")
+print(f"  Writing to: {BRONZE_EVENTS_TABLE}")
+print(f"  Checkpoint: {EVENTS_CHECKPOINT}")
 print(f"  Processing Interval: 5 seconds")
 
 print("\n" + "=" * 80)
-print("SYSLOG STREAMING MODE ACTIVE")
+print("EVENTS STREAMING MODE ACTIVE")
 print("=" * 80)
-print("Syslog stream is now running continuously.")
+print("Transaction events stream is now running continuously.")
 print("New files will be processed every 5 seconds.")
 print("The stream will run until manually stopped.")
 print("=" * 80 + "\n")
@@ -109,10 +108,9 @@ print("=" * 80 + "\n")
 # MAGIC %md
 # MAGIC ## Next Steps
 # MAGIC 
-# MAGIC 1. [OK] Syslog bronze ingestion started
-# MAGIC 2. → Run `01_2_bronze_ingestion_snmp.py` on a separate compute for SNMP ingestion
-# MAGIC 3. → Use `01_3_bronze_monitor.py` to monitor ingestion progress
-# MAGIC 4. → Create DLT pipelines for silver and gold layers
+# MAGIC 1. [OK] Events bronze ingestion started
+# MAGIC 2. → Run `01_2_bronze_ingestion_metrics.py` on a separate compute for store metrics
+# MAGIC 3. → Create DLT pipelines for silver and gold layers
 # MAGIC 
 # MAGIC **Note:** This stream runs continuously. To stop, detach or stop the notebook execution.
 
@@ -120,37 +118,35 @@ print("=" * 80 + "\n")
 
 # MAGIC %md
 # MAGIC ## Batch Mode (Reference)
-# MAGIC 
-# MAGIC For one-time batch processing, use the code below.
 
 # COMMAND ----------
 
 # BATCH MODE CODE (Commented)
 """
-syslog_batch = (
+events_batch = (
     spark.readStream
     .format("cloudFiles")
     .option("cloudFiles.format", "text")
-    .option("cloudFiles.schemaLocation", SYSLOG_SCHEMA_LOCATION)
+    .option("cloudFiles.schemaLocation", EVENTS_SCHEMA_LOCATION)
     .option("cloudFiles.includeExistingFiles", "true")
     .option("pathGlobFilter", "*.txt")
-    .load(SYSLOG_SFTP_PATH)
+    .load(EVENTS_SFTP_PATH)
     .withColumn("ingestion_timestamp", current_timestamp())
     .withColumn("source_file", col("_metadata.file_path"))
     .writeStream
     .format("delta")
-    .option("checkpointLocation", SYSLOG_CHECKPOINT)
+    .option("checkpointLocation", EVENTS_CHECKPOINT)
     .option("mergeSchema", "true")
     .outputMode("append")
     .trigger(availableNow=True)
-    .toTable(BRONZE_SYSLOG_TABLE)
+    .toTable(BRONZE_EVENTS_TABLE)
 )
 
-syslog_batch.awaitTermination()
-print("[OK] Syslog batch ingestion complete")
+events_batch.awaitTermination()
+print("[OK] Events batch ingestion complete")
 
-syslog_count = spark.table(BRONZE_SYSLOG_TABLE).count()
-print(f"Total syslog records ingested: {syslog_count:,}")
-display(spark.table(BRONZE_SYSLOG_TABLE).limit(10))
+events_count = spark.table(BRONZE_EVENTS_TABLE).count()
+print(f"Total events records ingested: {events_count:,}")
+display(spark.table(BRONZE_EVENTS_TABLE).limit(10))
 """
 

@@ -1,8 +1,15 @@
-# Telco Network Performance Demo - Architecture
+# Real-Time Performance Monitoring Demo - Architecture
 
 ## Overview
 
-This document provides a detailed technical architecture of the Telco Network Performance monitoring solution built on Databricks GCP.
+This document provides a detailed technical architecture of the real-time performance monitoring solution built on Databricks GCP. The architecture is industry-agnostic and supports multiple data domains.
+
+## Available Industry Flavors
+
+| Flavor | Use Case | Data Types |
+|--------|----------|------------|
+| **Telco Network Performance** | Network device monitoring | Syslog (RFC 5424), SNMP metrics |
+| **Retail Store Performance** | Store operations monitoring | POS events, sales metrics, inventory |
 
 ## High-Level Architecture
 
@@ -14,21 +21,21 @@ This document provides a detailed technical architecture of the Telco Network Pe
 │  │                  GCE SFTP Server (us-central1)               │  │
 │  │  ┌────────────────────────────────────────────────────────┐  │  │
 │  │  │  Python Data Generator (Systemd Service)               │  │  │
-│  │  │  - RFC 5424 Syslog (text files)                       │  │  │
-│  │  │  - SNMP Metrics (CSV files)                           │  │  │
-│  │  │  - Rate: 1000 files/minute                            │  │  │
-│  │  │  - 100 simulated network devices                      │  │  │
+│  │  │  - Event logs (text files)                             │  │  │
+│  │  │  - Metrics data (JSON/CSV files)                       │  │  │
+│  │  │  - Rate: Configurable files/minute                     │  │  │
+│  │  │  - Simulated entities (devices, stores, etc.)          │  │  │
 │  │  └────────────────────────────────────────────────────────┘  │  │
 │  │                            ↓                                  │  │
 │  │  ┌────────────────────────────────────────────────────────┐  │  │
-│  │  │  SFTP Directories                                      │  │  │
-│  │  │  /sftp/telco/syslog/*.txt  (500 files/min)            │  │  │
-│  │  │  /sftp/telco/snmp/*.csv    (500 files/min)            │  │  │
+│  │  │  Data Directories                                      │  │  │
+│  │  │  /sftp/<domain>/logs/*   (SFTP accessible)             │  │  │
+│  │  │  gs://bucket/metrics/*   (GCS bucket)                  │  │  │
 │  │  └────────────────────────────────────────────────────────┘  │  │
 │  └──────────────────────────────────────────────────────────────┘  │
 │                            ↓                                        │
 │                    Port 22 (SFTP/SSH)                              │
-│                    Password Authentication                          │
+│                    Credential-based Authentication                  │
 │                            ↓                                        │
 │  ┌──────────────────────────────────────────────────────────────┐  │
 │  │              Databricks Workspace (GCP)                      │  │
@@ -36,18 +43,18 @@ This document provides a detailed technical architecture of the Telco Network Pe
 │  │                                                              │  │
 │  │  ┌────────────────────────────────────────────────────────┐ │  │
 │  │  │  Unity Catalog Connection                              │ │  │
-│  │  │  - Type: SFTP                                          │ │  │
-│  │  │  - Credentials: Secured                                │ │  │
+│  │  │  - Type: SFTP / GCS                                    │ │  │
+│  │  │  - Credentials: Secured via Secrets                    │ │  │
 │  │  │  - Governance: Full lineage tracking                   │ │  │
 │  │  └────────────────────────────────────────────────────────┘ │  │
 │  │                            ↓                                 │  │
 │  │  ┌────────────────────────────────────────────────────────┐ │  │
-│  │  │         BRONZE LAYER (telco_network.bronze)            │ │  │
+│  │  │         BRONZE LAYER (<catalog>.bronze)                │ │  │
 │  │  │                                                        │ │  │
-│  │  │  Auto Loader (SFTP Connector)                         │ │  │
+│  │  │  Auto Loader (SFTP/GCS Connector)                     │ │  │
 │  │  │  ┌──────────────────┐  ┌──────────────────┐          │ │  │
-│  │  │  │ syslog_raw       │  │ snmp_raw         │          │ │  │
-│  │  │  │ - Format: text   │  │ - Format: csv    │          │ │  │
+│  │  │  │ logs_raw         │  │ metrics_raw      │          │ │  │
+│  │  │  │ - Format: text   │  │ - Format: json   │          │ │  │
 │  │  │  │ - Schema: infer  │  │ - Schema: infer  │          │ │  │
 │  │  │  │ - Evolution: on  │  │ - Evolution: on  │          │ │  │
 │  │  │  │ - CDF: enabled   │  │ - CDF: enabled   │          │ │  │
@@ -55,76 +62,71 @@ This document provides a detailed technical architecture of the Telco Network Pe
 │  │  └────────────────────────────────────────────────────────┘ │  │
 │  │                            ↓                                 │  │
 │  │  ┌────────────────────────────────────────────────────────┐ │  │
-│  │  │         SILVER LAYER (telco_network.silver)            │ │  │
+│  │  │         SILVER LAYER (<catalog>.silver)                │ │  │
 │  │  │              Delta Live Tables (DLT)                   │ │  │
 │  │  │                                                        │ │  │
 │  │  │  ┌──────────────────────────────────────────────────┐ │ │  │
-│  │  │  │ silver_syslog_parsed                             │ │ │  │
-│  │  │  │ - Parse RFC 5424 format                          │ │ │  │
-│  │  │  │ - Extract: priority, severity, hostname, etc.    │ │ │  │
-│  │  │  │ - Classify event categories                      │ │ │  │
-│  │  │  │ - Expectations: device_id NOT NULL, etc.         │ │ │  │
+│  │  │  │ silver_logs_parsed                              │ │ │  │
+│  │  │  │ - Parse log format (RFC 5424, JSON, etc.)       │ │ │  │
+│  │  │  │ - Extract: timestamps, IDs, categories          │ │ │  │
+│  │  │  │ - Classify event types                          │ │ │  │
+│  │  │  │ - Expectations: entity_id NOT NULL, etc.        │ │ │  │
 │  │  │  └──────────────────────────────────────────────────┘ │ │  │
 │  │  │                                                        │ │  │
 │  │  │  ┌──────────────────────────────────────────────────┐ │ │  │
-│  │  │  │ silver_snmp_metrics                              │ │ │  │
-│  │  │  │ - Type casting & validation                      │ │ │  │
-│  │  │  │ - Anomaly detection                              │ │ │  │
-│  │  │  │ - Expectations: value >= 0, ranges, etc.         │ │ │  │
+│  │  │  │ silver_metrics_validated                        │ │ │  │
+│  │  │  │ - Type casting & validation                     │ │ │  │
+│  │  │  │ - Anomaly detection                             │ │ │  │
+│  │  │  │ - Expectations: value >= 0, ranges, etc.        │ │ │  │
 │  │  │  └──────────────────────────────────────────────────┘ │ │  │
 │  │  │                                                        │ │  │
 │  │  │  ┌──────────────────────────────────────────────────┐ │ │  │
-│  │  │  │ silver_network_events (deduplicated)             │ │ │  │
+│  │  │  │ silver_events (deduplicated)                    │ │ │  │
 │  │  │  └──────────────────────────────────────────────────┘ │ │  │
 │  │  └────────────────────────────────────────────────────────┘ │  │
 │  │                            ↓                                 │  │
 │  │  ┌────────────────────────────────────────────────────────┐ │  │
-│  │  │           GOLD LAYER (telco_network.gold)              │ │  │
+│  │  │           GOLD LAYER (<catalog>.gold)                  │ │  │
 │  │  │              Delta Live Tables (DLT)                   │ │  │
 │  │  │                                                        │ │  │
 │  │  │  ┌──────────────────────────────────────────────────┐ │ │  │
-│  │  │  │ gold_network_performance_5min                    │ │ │  │
-│  │  │  │ - 5-minute aggregations (avg, min, max, p95)     │ │ │  │
-│  │  │  │ - By device, metric, location                    │ │ │  │
+│  │  │  │ gold_performance_5min                           │ │ │  │
+│  │  │  │ - 5-minute aggregations (avg, min, max, p95)    │ │ │  │
+│  │  │  │ - By entity, metric, location                   │ │ │  │
 │  │  │  └──────────────────────────────────────────────────┘ │ │  │
 │  │  │                                                        │ │  │
 │  │  │  ┌──────────────────────────────────────────────────┐ │ │  │
-│  │  │  │ gold_device_health                               │ │ │  │
-│  │  │  │ - Current health per device                      │ │ │  │
-│  │  │  │ - Health score (0-100)                           │ │ │  │
-│  │  │  │ - Alert flags                                    │ │ │  │
+│  │  │  │ gold_entity_health                              │ │ │  │
+│  │  │  │ - Current health per entity                     │ │ │  │
+│  │  │  │ - Health score (0-100)                          │ │ │  │
+│  │  │  │ - Alert flags                                   │ │ │  │
 │  │  │  └──────────────────────────────────────────────────┘ │ │  │
 │  │  │                                                        │ │  │
 │  │  │  ┌──────────────────────────────────────────────────┐ │ │  │
-│  │  │  │ gold_network_events (enriched)                   │ │ │  │
+│  │  │  │ gold_events (enriched)                          │ │ │  │
 │  │  │  └──────────────────────────────────────────────────┘ │ │  │
 │  │  │                                                        │ │  │
 │  │  │  ┌──────────────────────────────────────────────────┐ │ │  │
-│  │  │  │ dim_devices (SCD Type 1)                         │ │ │  │
-│  │  │  │ - Device master data                             │ │ │  │
-│  │  │  │ - Join keys: device_id, location                 │ │ │  │
-│  │  │  │ - Ready for IMS integration (Delta Share)        │ │ │  │
+│  │  │  │ dim_entities (SCD Type 1)                       │ │ │  │
+│  │  │  │ - Entity master data                            │ │ │  │
+│  │  │  │ - Ready for cross-cloud integration             │ │ │  │
 │  │  │  └──────────────────────────────────────────────────┘ │ │  │
 │  │  │                                                        │ │  │
 │  │  │  ┌──────────────────────────────────────────────────┐ │ │  │
-│  │  │  │ gold_metrics_by_location                         │ │ │  │
-│  │  │  │ gold_kpi_hourly                                  │ │ │  │
+│  │  │  │ gold_metrics_by_location                        │ │ │  │
+│  │  │  │ gold_kpi_hourly                                 │ │ │  │
 │  │  │  └──────────────────────────────────────────────────┘ │ │  │
 │  │  └────────────────────────────────────────────────────────┘ │  │
 │  │                            ↓                                 │  │
 │  │  ┌────────────────────────────────────────────────────────┐ │  │
-│  │  │       METRICS LAYER (telco_network.metrics)            │ │  │
+│  │  │       METRICS LAYER (<catalog>.metrics)                │ │  │
 │  │  │           Unity Catalog Metric Views                   │ │  │
 │  │  │                                                        │ │  │
-│  │  │  - mv_realtime_latency                                │ │  │
-│  │  │  - mv_packet_loss_rate                                │ │  │
-│  │  │  - mv_throughput_utilization                          │ │  │
-│  │  │  - mv_jitter_monitoring                               │ │  │
-│  │  │  - mv_error_rate_alerts                               │ │  │
-│  │  │  - mv_network_health_score                            │ │  │
-│  │  │  - mv_geographic_performance                          │ │  │
-│  │  │  - mv_kpi_hourly_dashboard                            │ │  │
-│  │  │  - mv_top_problem_devices                             │ │  │
+│  │  │  - mv_realtime_performance                             │ │  │
+│  │  │  - mv_entity_health_score                              │ │  │
+│  │  │  - mv_geographic_performance                           │ │  │
+│  │  │  - mv_kpi_hourly_dashboard                             │ │  │
+│  │  │  - mv_top_problem_entities                             │ │  │
 │  │  └────────────────────────────────────────────────────────┘ │  │
 │  │                            ↓                                 │  │
 │  │  ┌────────────────────────────────────────────────────────┐ │  │
@@ -141,14 +143,13 @@ This document provides a detailed technical architecture of the Telco Network Pe
 │                                                                      │
 │  AWS Databricks Workspace                                           │
 │  ┌────────────────────────────────────────────────────────────────┐ │
-│  │  IMS Gold Table (Delta Share Provider)                         │ │
-│  │  - Subscriber data                                             │ │
-│  │  - Session information                                         │ │
-│  │  - Join keys: device_id, location                             │ │
+│  │  Cross-Cloud Gold Table (Delta Share Provider)                 │ │
+│  │  - Related data from other systems                             │ │
+│  │  - Join keys for unified analytics                             │ │
 │  └────────────────────────────────────────────────────────────────┘ │
 │                             ↓ Delta Share                           │
 │  GCP Databricks (Consumer)                                          │
-│  Join with dim_devices for unified telco analytics                 │
+│  Join with dim_entities for unified analytics                       │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -165,28 +166,23 @@ This document provides a detailed technical architecture of the Telco Network Pe
 **Python Data Generator:**
 - Language: Python 3
 - Framework: Custom script with threading
-- Libraries: Standard library (no external dependencies)
+- Libraries: Standard library (minimal dependencies)
 - Deployment: Systemd service for reliability
 
-**Syslog Generation (RFC 5424):**
-```
-Format: <PRI>VERSION TIMESTAMP HOSTNAME APP-NAME PROCID MSGID [STRUCTURED-DATA] MSG
-Example: <134>1 2025-12-02T14:23:45.123Z router-core-01 BGP 2341 ADJCHANGE [network@32473 peer="10.20.30.40"] neighbor Down
-```
+**Industry-Specific Data Formats:**
 
-**SNMP Generation (CSV):**
-```csv
-timestamp,device_id,device_type,location,vendor,model,ip_address,oid,metric_name,value
-2025-12-02T14:23:45.123Z,router-core-01,router,datacenter-east,Cisco,ASR-9000,10.45.12.3,1.3.6.1.2.1.1.1,latency_ms,45.23
-```
+| Flavor | Log Format | Metrics Format |
+|--------|------------|----------------|
+| Telco | RFC 5424 Syslog | CSV/JSON SNMP metrics |
+| Retail | JSON event logs | JSON sales/inventory metrics |
 
 ### 2. Networking Layer
 
 **VPC Configuration:**
-- Network: `databricks-telco-network`
-- Subnet: `databricks-telco-subnet` (10.128.0.0/20)
+- Network: Custom VPC for isolation
+- Subnet: Private subnet (10.128.0.0/20)
 - Firewall Rules:
-  - Allow SSH (port 22) from 0.0.0.0/0 (restrict in production)
+  - Allow SSH (port 22) from authorized IPs
   - Allow internal traffic
 
 **Static IP:**
@@ -197,14 +193,13 @@ timestamp,device_id,device_type,location,vendor,model,ip_address,oid,metric_name
 
 **Auto Loader Configuration:**
 
-| Feature | Syslog | SNMP |
-|---------|--------|------|
-| Format | text | csv |
-| Schema Inference | Disabled (text) | Enabled |
+| Feature | Logs | Metrics |
+|---------|------|---------|
+| Format | text/json | csv/json |
+| Schema Inference | Configurable | Enabled |
 | Schema Evolution | addNewColumns | addNewColumns |
-| File Pattern | *.txt | *.csv |
 | Trigger Mode | availableNow / continuous | availableNow / continuous |
-| Checkpoint | /tmp/telco_demo/checkpoints/syslog | /tmp/telco_demo/checkpoints/snmp |
+| Checkpoint | Unity Catalog Volume | Unity Catalog Volume |
 
 **Data Governance:**
 - Unity Catalog: All tables registered
@@ -220,13 +215,13 @@ timestamp,device_id,device_type,location,vendor,model,ip_address,oid,metric_name
 - Automatic schema evolution
 - Built-in monitoring and observability
 
-**Syslog Parsing:**
-- Regex extraction of RFC 5424 fields
-- Severity calculation: `priority % 8`
-- Facility calculation: `priority / 8`
-- Event categorization (routing, security, hardware, etc.)
+**Log Parsing:**
+- Format-specific extraction (RFC 5424, JSON, etc.)
+- Timestamp normalization
+- Event categorization
+- Entity ID extraction
 
-**SNMP Validation:**
+**Metrics Validation:**
 - Type casting and range validation
 - Anomaly detection using thresholds
 - Z-score calculation for outliers
@@ -234,9 +229,9 @@ timestamp,device_id,device_type,location,vendor,model,ip_address,oid,metric_name
 
 **Data Quality Expectations:**
 ```python
-@dlt.expect_or_drop("valid_device_id", "device_id IS NOT NULL")
-@dlt.expect("valid_latency", "metric_name != 'latency_ms' OR value <= 1000")
-@dlt.expect("valid_packet_loss", "metric_name != 'packet_loss_pct' OR value <= 100")
+@dlt.expect_or_drop("valid_entity_id", "entity_id IS NOT NULL")
+@dlt.expect("valid_metric_value", "value >= 0")
+@dlt.expect("valid_timestamp", "event_timestamp IS NOT NULL")
 ```
 
 ### 5. Analytics Layer (Gold)
@@ -244,15 +239,14 @@ timestamp,device_id,device_type,location,vendor,model,ip_address,oid,metric_name
 **Aggregation Strategy:**
 - Time Windows: 5-minute, 1-hour
 - Statistical Measures: avg, min, max, p50, p95, p99, stddev
-- Dimensions: device_id, device_type, location, metric_name
+- Dimensions: entity_id, entity_type, location, metric_name
 - Watermarking: Handle late-arriving data
 
-**Device Health Scoring Algorithm:**
+**Entity Health Scoring Algorithm:**
 ```
 Health Score = 100 - (
-  latency_penalty +
-  packet_loss_penalty +
-  jitter_penalty +
+  primary_metric_penalty +
+  secondary_metric_penalty +
   critical_events_penalty
 )
 
@@ -260,7 +254,7 @@ Where penalties are based on threshold ranges
 ```
 
 **SCD (Slowly Changing Dimensions):**
-- Type 1 for device attributes
+- Type 1 for entity attributes
 - Effective dates for historical tracking
 - Active flag for current records
 
@@ -272,18 +266,11 @@ Where penalties are based on threshold ranges
 - SQL-based for easy consumption
 - Support for time-series analysis
 
-**KPIs Monitored:**
-1. Latency (response time)
-2. Packet Loss (reliability)
-3. Throughput (capacity)
-4. Jitter (QoS)
-5. Error Rate (stability)
-
 ### 7. Data Flow & Latency
 
 **End-to-End Latency:**
 ```
-File Generation → SFTP Write → Auto Loader Detection → Bronze Ingestion → Silver Parsing → Gold Aggregation → Metric View
+File Generation → SFTP/GCS Write → Auto Loader Detection → Bronze Ingestion → Silver Parsing → Gold Aggregation → Metric View
      ~0s              ~1s              ~10s                 ~15s              ~30s              ~45s             ~60s
 
 Total: ~2 minutes from event generation to queryable metric
@@ -298,12 +285,12 @@ Total: ~2 minutes from event generation to queryable metric
 ### 8. Unity Catalog Lineage
 
 ```
-SFTP Connection → bronze.syslog_raw → silver.silver_syslog_parsed → gold.gold_network_events → metrics.mv_*
-                                                                  ↘→ gold.gold_device_health
+Connection → bronze.logs_raw → silver.silver_logs_parsed → gold.gold_events → metrics.mv_*
+                                                         ↘→ gold.gold_entity_health
                 
-SFTP Connection → bronze.snmp_raw → silver.silver_snmp_metrics → gold.gold_network_performance_5min → metrics.mv_*
-                                                               ↘→ gold.gold_device_health
-                                                               ↘→ gold.dim_devices (for IMS join)
+Connection → bronze.metrics_raw → silver.silver_metrics_validated → gold.gold_performance_5min → metrics.mv_*
+                                                                   ↘→ gold.gold_entity_health
+                                                                   ↘→ gold.dim_entities (for cross-cloud join)
 ```
 
 ## Scalability Considerations
@@ -312,15 +299,15 @@ SFTP Connection → bronze.snmp_raw → silver.silver_snmp_metrics → gold.gold
 - **Data Volume**: 1000 files/min = ~1.44M files/day
 - **File Size**: ~10-50 KB average
 - **Daily Data**: ~50-200 GB/day
-- **Devices**: 100 simulated devices
+- **Entities**: 100+ simulated entities
 
 ### Scale-Out Potential
 - **10x Scale**: 10,000 files/min with cluster auto-scaling
 - **100x Scale**: Add Databricks serverless for unlimited scale
-- **Multi-Region**: Deploy additional SFTP servers in different GCP regions
+- **Multi-Region**: Deploy additional servers in different GCP regions
 
 ### Performance Optimizations
-- Delta Lake Z-ordering on (device_id, event_timestamp)
+- Delta Lake Z-ordering on (entity_id, event_timestamp)
 - Partitioning by date for time-series queries
 - Auto-compaction for small file optimization
 - Liquid clustering (Delta Lake 3.0+) for adaptive optimization
@@ -328,7 +315,7 @@ SFTP Connection → bronze.snmp_raw → silver.silver_snmp_metrics → gold.gold
 ## Security & Compliance
 
 ### Authentication & Authorization
-- SFTP: Password-based (demo) / SSH key (production)
+- SFTP: SSH key-based authentication (recommended for production)
 - Databricks: Unity Catalog RBAC
 - GCP: IAM roles and service accounts
 
@@ -346,7 +333,7 @@ SFTP Connection → bronze.snmp_raw → silver.silver_snmp_metrics → gold.gold
 ## Future Enhancements
 
 1. **Cross-Cloud Integration**
-   - Delta Share with AWS for IMS data
+   - Delta Share with AWS for related data
    - Multi-cloud analytics federation
 
 2. **Advanced Analytics**
@@ -362,7 +349,7 @@ SFTP Connection → bronze.snmp_raw → silver.silver_snmp_metrics → gold.gold
 4. **Additional Data Sources**
    - Direct API ingestion (REST/gRPC)
    - Kafka/Pub-Sub streaming
-   - Cloud Storage (GCS) integration
+   - Additional Cloud Storage integration
 
 ## Technology Stack
 
@@ -384,4 +371,3 @@ SFTP Connection → bronze.snmp_raw → silver.silver_snmp_metrics → gold.gold
 - [Delta Live Tables](https://docs.databricks.com/gcp/en/ldp/develop)
 - [Unity Catalog Metric Views](https://docs.databricks.com/gcp/en/metric-views/)
 - [RFC 5424 Syslog Protocol](https://datatracker.ietf.org/doc/html/rfc5424)
-

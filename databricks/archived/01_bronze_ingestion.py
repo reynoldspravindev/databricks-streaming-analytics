@@ -96,7 +96,7 @@ syslog_query = (
     .toTable(BRONZE_SYSLOG_TABLE)
 )
 
-print(f"✓ Started syslog continuous ingestion stream")
+print(f"[OK] Started syslog continuous ingestion stream")
 print(f"  Writing to: {BRONZE_SYSLOG_TABLE}")
 print(f"  Checkpoint: {SYSLOG_CHECKPOINT}")
 print(f"  Processing Interval: 5 seconds")
@@ -144,7 +144,7 @@ snmp_query = (
     .toTable(BRONZE_SNMP_TABLE)
 )
 
-print(f"✓ Started SNMP continuous ingestion stream")
+print(f"[OK] Started SNMP continuous ingestion stream")
 print(f"  Writing to: {BRONZE_SNMP_TABLE}")
 print(f"  Checkpoint: {SNMP_CHECKPOINT}")
 print(f"  Processing Interval: 5 seconds")
@@ -162,7 +162,7 @@ print("=" * 80 + "\n")
 # MAGIC %md
 # MAGIC ## Next Steps
 # MAGIC 
-# MAGIC 1. ✓ Bronze layer continuous ingestion started
+# MAGIC 1. [OK] Bronze layer continuous ingestion started
 # MAGIC 2. → Use `01_bronze_monitor.py` to monitor ingestion progress and enable CDF
 # MAGIC 3. → Create DLT pipeline for `02_silver_pipeline.py` to parse and validate the data
 # MAGIC 4. → Create DLT pipeline for `03_gold_pipeline.py` to create aggregated metrics
@@ -205,7 +205,7 @@ syslog_batch = (
 
 # Wait for completion
 syslog_batch.awaitTermination()
-print("✓ Syslog batch ingestion complete")
+print("[OK] Syslog batch ingestion complete")
 
 # Batch SNMP Ingestion
 snmp_batch = (
@@ -233,7 +233,7 @@ snmp_batch = (
 
 # Wait for completion
 snmp_batch.awaitTermination()
-print("✓ SNMP batch ingestion complete")
+print("[OK] SNMP batch ingestion complete")
 
 # Check ingestion results
 syslog_count = spark.table(BRONZE_SYSLOG_TABLE).count()
@@ -255,8 +255,8 @@ display(spark.table(BRONZE_SNMP_TABLE).limit(10))
 # MAGIC %md
 # MAGIC ## Next Steps
 # MAGIC 
-# MAGIC 1. ✓ Bronze layer continuous ingestion started
-# MAGIC 2. ✓ Monitor ingestion progress using the queries above
+# MAGIC 1. [OK] Bronze layer continuous ingestion started
+# MAGIC 2. [OK] Monitor ingestion progress using the queries above
 # MAGIC 3. → Create DLT pipeline for `02_silver_pipeline.py` to parse and validate the data
 # MAGIC 4. → Create DLT pipeline for `03_gold_pipeline.py` to create aggregated metrics
 # MAGIC 5. → Run `04_metric_views.sql` to set up monitoring views

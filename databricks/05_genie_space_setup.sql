@@ -9,7 +9,7 @@
 -- MAGIC 
 -- MAGIC ---
 -- MAGIC 
--- MAGIC # 🚀 Genie Space Configuration
+-- MAGIC # == Genie Space Configuration
 -- MAGIC 
 -- MAGIC ## Space Name
 -- MAGIC **Telco Network Performance Analytics**
@@ -45,7 +45,7 @@
 -- COMMAND ----------
 
 -- MAGIC %md
--- MAGIC # 📝 Genie Space Instructions
+-- MAGIC # == Genie Space Instructions
 -- MAGIC 
 -- MAGIC **Copy and paste the following into the Genie Space "General Instructions" section:**
 -- MAGIC 
@@ -397,7 +397,7 @@
 -- COMMAND ----------
 
 -- MAGIC %md
--- MAGIC # 🎯 Step-by-Step Genie Space Creation
+-- MAGIC # == Step-by-Step Genie Space Creation
 -- MAGIC 
 -- MAGIC ## Step 1: Navigate to Genie
 -- MAGIC 1. In Databricks workspace, click **"New"** in the sidebar
@@ -457,7 +457,7 @@
 -- COMMAND ----------
 
 -- MAGIC %md
--- MAGIC # ✅ Verification Queries
+-- MAGIC # == Verification Queries
 -- MAGIC 
 -- MAGIC Run these queries to verify data is available for Genie:
 

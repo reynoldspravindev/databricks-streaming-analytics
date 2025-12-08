@@ -856,7 +856,7 @@ class IMSDataGenerator:
                 full_table = f"{catalog}.{schema}.{table_name}"
                 spark.sql(f"OPTIMIZE {full_table}")
                 spark.sql(f"ANALYZE TABLE {full_table} COMPUTE STATISTICS FOR ALL COLUMNS")
-            print("✅ All tables optimized!")
+            print("[OK] All tables optimized!")
         
         return results
     
@@ -895,7 +895,7 @@ class IMSDataGenerator:
         """)
         
         count = spark.table(table_name).count()
-        print(f"✅ Created {table_name} ({count:,} records)")
+        print(f"[OK] Created {table_name} ({count:,} records)")
         return count
     
     def _write_sip_sessions_table(
@@ -932,7 +932,7 @@ class IMSDataGenerator:
         """)
         
         count = spark.table(table_name).count()
-        print(f"✅ Created {table_name} ({count:,} records)")
+        print(f"[OK] Created {table_name} ({count:,} records)")
         return count
     
     def _write_node_metrics_table(
@@ -969,7 +969,7 @@ class IMSDataGenerator:
         """)
         
         count = spark.table(table_name).count()
-        print(f"✅ Created {table_name} ({count:,} records)")
+        print(f"[OK] Created {table_name} ({count:,} records)")
         return count
     
     def _write_subscriber_sessions_table(
@@ -1006,7 +1006,7 @@ class IMSDataGenerator:
         """)
         
         count = spark.table(table_name).count()
-        print(f"✅ Created {table_name} ({count:,} records)")
+        print(f"[OK] Created {table_name} ({count:,} records)")
         return count
     
     def setup_delta_share(
@@ -1045,7 +1045,7 @@ class IMSDataGenerator:
             CREATE SHARE IF NOT EXISTS {share_name}
             COMMENT 'Telco IMS data share for cross-cloud analytics with GCP'
         """)
-        print(f"✅ Created share: {share_name}")
+        print(f"[OK] Created share: {share_name}")
         
         # Add tables to the share
         tables = [
@@ -1064,13 +1064,13 @@ class IMSDataGenerator:
                     COMMENT '{description}'
                 """)
                 result["tables_shared"].append(table_name)
-                print(f"✅ Added {table_name} to share")
+                print(f"[OK] Added {table_name} to share")
             except Exception as e:
                 if "already exists" in str(e).lower():
                     result["tables_shared"].append(table_name)
-                    print(f"ℹ️ {table_name} already in share")
+                    print(f"[INFO] {table_name} already in share")
                 else:
-                    print(f"❌ Error adding {table_name}: {e}")
+                    print(f"[ERROR] Error adding {table_name}: {e}")
         
         # Create recipient if specified
         if recipient_name:
@@ -1098,10 +1098,10 @@ class IMSDataGenerator:
                     "name": recipient_name,
                     "info": [row.asDict() for row in recipient_info]
                 }
-                print(f"✅ Created recipient: {recipient_name}")
+                print(f"[OK] Created recipient: {recipient_name}")
                 
             except Exception as e:
-                print(f"⚠️ Recipient creation note: {e}")
+                print(f"[WARNING] Recipient creation note: {e}")
         
         return result
 

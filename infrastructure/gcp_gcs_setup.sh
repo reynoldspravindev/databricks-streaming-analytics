@@ -42,13 +42,13 @@ if gsutil ls -b gs://${BUCKET_NAME} 2>/dev/null; then
     echo "Bucket already exists, skipping creation"
 else
     gsutil mb -l ${REGION} -p ${PROJECT_ID} gs://${BUCKET_NAME}/
-    echo "✓ Bucket created"
+    echo "[OK] Bucket created"
 fi
 
 # Create folder structure
 echo "Creating folder structure..."
 echo "" | gsutil cp - gs://${BUCKET_NAME}/snmp/.keep
-echo "✓ Folder structure created"
+echo "[OK] Folder structure created"
 
 # Set lifecycle policy to auto-delete old files (optional, for demo cleanup)
 echo "Setting lifecycle policy (delete files older than 7 days)..."
@@ -66,7 +66,7 @@ cat > /tmp/lifecycle.json << EOF
 EOF
 gsutil lifecycle set /tmp/lifecycle.json gs://${BUCKET_NAME}/
 rm /tmp/lifecycle.json
-echo "✓ Lifecycle policy set"
+echo "[OK] Lifecycle policy set"
 
 # Get the VM's service account
 echo "Getting VM service account..."
@@ -80,7 +80,7 @@ else
     echo "Granting write access to VM service account: ${VM_SA}..."
     gsutil iam ch serviceAccount:${VM_SA}:objectCreator gs://${BUCKET_NAME}/
     gsutil iam ch serviceAccount:${VM_SA}:objectViewer gs://${BUCKET_NAME}/
-    echo "✓ IAM permissions granted"
+    echo "[OK] IAM permissions granted"
 fi
 
 echo ""
@@ -94,7 +94,7 @@ if gcloud pubsub topics describe ${PUBSUB_TOPIC} --project=${PROJECT_ID} 2>/dev/
     echo "Topic already exists, skipping creation"
 else
     gcloud pubsub topics create ${PUBSUB_TOPIC} --project=${PROJECT_ID}
-    echo "✓ Pub/Sub topic created"
+    echo "[OK] Pub/Sub topic created"
 fi
 
 # Create Pub/Sub subscription for Auto Loader
@@ -107,7 +107,7 @@ else
         --ack-deadline=60 \
         --message-retention-duration=7d \
         --project=${PROJECT_ID}
-    echo "✓ Pub/Sub subscription created"
+    echo "[OK] Pub/Sub subscription created"
 fi
 
 # Create GCS notification to Pub/Sub topic
@@ -123,7 +123,7 @@ else
         -e OBJECT_FINALIZE \
         -p snmp/ \
         gs://${BUCKET_NAME}
-    echo "✓ GCS notification created"
+    echo "[OK] GCS notification created"
 fi
 
 # Get the GCS service account for the project
@@ -138,7 +138,7 @@ gcloud pubsub topics add-iam-policy-binding ${PUBSUB_TOPIC} \
     --member="serviceAccount:${GCS_SA}" \
     --role="roles/pubsub.publisher" \
     --project=${PROJECT_ID} 2>/dev/null || echo "Policy binding may already exist"
-echo "✓ Pub/Sub permissions configured"
+echo "[OK] Pub/Sub permissions configured"
 
 # Save configuration
 CONFIG_FILE="gcs_config.env"

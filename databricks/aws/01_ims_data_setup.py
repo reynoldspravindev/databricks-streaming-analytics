@@ -360,7 +360,7 @@ volte_df.write \
     .partitionBy("originating_region", "call_type") \
     .saveAsTable(f"{CATALOG_NAME}.{SCHEMA_NAME}.ims_volte_cdrs")
 
-print(f"✅ Created table: {CATALOG_NAME}.{SCHEMA_NAME}.ims_volte_cdrs")
+print(f"[OK] Created table: {CATALOG_NAME}.{SCHEMA_NAME}.ims_volte_cdrs")
 display(spark.sql(f"SELECT COUNT(*) as record_count FROM {CATALOG_NAME}.{SCHEMA_NAME}.ims_volte_cdrs"))
 
 # COMMAND ----------
@@ -382,7 +382,7 @@ sip_df.write \
     .partitionBy("region", "ims_node_type") \
     .saveAsTable(f"{CATALOG_NAME}.{SCHEMA_NAME}.ims_sip_sessions")
 
-print(f"✅ Created table: {CATALOG_NAME}.{SCHEMA_NAME}.ims_sip_sessions")
+print(f"[OK] Created table: {CATALOG_NAME}.{SCHEMA_NAME}.ims_sip_sessions")
 display(spark.sql(f"SELECT COUNT(*) as record_count FROM {CATALOG_NAME}.{SCHEMA_NAME}.ims_sip_sessions"))
 
 # COMMAND ----------
@@ -404,7 +404,7 @@ node_df.write \
     .partitionBy("ims_node_type", "region") \
     .saveAsTable(f"{CATALOG_NAME}.{SCHEMA_NAME}.ims_node_metrics")
 
-print(f"✅ Created table: {CATALOG_NAME}.{SCHEMA_NAME}.ims_node_metrics")
+print(f"[OK] Created table: {CATALOG_NAME}.{SCHEMA_NAME}.ims_node_metrics")
 display(spark.sql(f"SELECT COUNT(*) as record_count FROM {CATALOG_NAME}.{SCHEMA_NAME}.ims_node_metrics"))
 
 # COMMAND ----------
@@ -426,7 +426,7 @@ sub_df.write \
     .partitionBy("region", "subscription_type") \
     .saveAsTable(f"{CATALOG_NAME}.{SCHEMA_NAME}.ims_subscriber_sessions")
 
-print(f"✅ Created table: {CATALOG_NAME}.{SCHEMA_NAME}.ims_subscriber_sessions")
+print(f"[OK] Created table: {CATALOG_NAME}.{SCHEMA_NAME}.ims_subscriber_sessions")
 display(spark.sql(f"SELECT COUNT(*) as record_count FROM {CATALOG_NAME}.{SCHEMA_NAME}.ims_subscriber_sessions"))
 
 # COMMAND ----------
@@ -445,7 +445,7 @@ for table in tables:
     spark.sql(f"OPTIMIZE {full_table}")
     spark.sql(f"ANALYZE TABLE {full_table} COMPUTE STATISTICS FOR ALL COLUMNS")
 
-print("✅ All tables optimized!")
+print("[OK] All tables optimized!")
 
 # COMMAND ----------
 
@@ -465,7 +465,7 @@ CREATE SHARE IF NOT EXISTS {SHARE_NAME}
 COMMENT 'Telco IMS data share for cross-cloud analytics with GCP'
 """)
 
-print(f"✅ Created share: {SHARE_NAME}")
+print(f"[OK] Created share: {SHARE_NAME}")
 
 # COMMAND ----------
 
@@ -490,12 +490,12 @@ for table_name, comment in tables_to_share:
         ADD TABLE {full_table}
         COMMENT '{comment}'
         """)
-        print(f"✅ Added {table_name} to share")
+        print(f"[OK] Added {table_name} to share")
     except Exception as e:
         if "already exists" in str(e).lower():
-            print(f"ℹ️ {table_name} already in share")
+            print(f"[INFO] {table_name} already in share")
         else:
-            print(f"❌ Error adding {table_name}: {e}")
+            print(f"[ERROR] Error adding {table_name}: {e}")
 
 # COMMAND ----------
 

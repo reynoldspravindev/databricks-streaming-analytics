@@ -1,12 +1,21 @@
-# Telco Network Performance Demo on Databricks GCP
+# Real-Time Performance Monitoring Demo on Databricks GCP
 
-A comprehensive demonstration of real-time telco network performance monitoring using Databricks on Google Cloud Platform (GCP), showcasing SFTP ingestion, medallion architecture, and Unity Catalog governance.
+A comprehensive demonstration of real-time performance monitoring using Databricks on Google Cloud Platform (GCP), showcasing SFTP ingestion, medallion architecture, and Unity Catalog governance.
+
+## Available Industry Flavors
+
+This demo supports multiple industry use cases. Choose the one that best fits your needs:
+
+| Flavor | Description | Data Generator | Notebooks |
+|--------|-------------|----------------|-----------|
+| **Telco Network Performance** | Monitor network devices, latency, packet loss, throughput | `telco_data_generator.py` | `databricks/*.py/sql` |
+| **Retail Store Performance** | Track store events, sales metrics, inventory, customer flow | `retail_data_generator.py` | `databricks/retail/*.py/sql` |
 
 ## Demo Objectives
 
 This demo showcases:
 
-1. **Reduced Latency**: Near real-time network telemetry processing using Databricks Auto Loader and streaming
+1. **Reduced Latency**: Near real-time telemetry processing using Databricks Auto Loader and streaming
 2. **Reduced TCO**: Cost optimization compared to GCP BigQuery for large-scale analytics workloads
 3. **Unified Platform**: Single platform for ingestion, transformation, analytics, and serving
 4. **Enterprise Governance**: Unity Catalog for lineage, security, and cross-cloud data sharing
@@ -17,14 +26,15 @@ This demo showcases:
 ┌──────────────────────────────────────────────────────────────┐
 │                         GCE VM                                │
 │  ┌────────────────────────────────────────────────────────┐  │
-│  │              telco_data_generator.py                    │  │
+│  │              data_generator.py                          │  │
+│  │         (telco or retail flavor)                        │  │
 │  └────────────────────┬─────────────────┬─────────────────┘  │
 │                       │                 │                     │
-│             Syslog (TXT)          SNMP (JSON)                │
+│           Events/Logs (TXT)       Metrics (JSON)             │
 │                       │                 │                     │
 │                       ▼                 ▼                     │
-│            /sftp/telco/syslog    GCS Bucket                  │
-│                       │          gs://bucket/snmp/           │
+│              /sftp/data/logs      GCS Bucket                 │
+│                       │          gs://bucket/metrics/        │
 └───────────────────────│─────────────────│────────────────────┘
                         │                 │
                         │    1000 files/minute                  
@@ -35,13 +45,13 @@ This demo showcases:
 │  ┌─────────────┐  ┌─────────────┐                           │
 │  │ Auto Loader │  │ Auto Loader │                           │
 │  │   (SFTP)    │  │   (GCS)     │                           │
-│  │  Syslog     │  │   SNMP      │                           │
+│  │   Logs      │  │   Metrics   │                           │
 │  └──────┬──────┘  └──────┬──────┘                           │
 │         │                │                                   │
 │         ▼                ▼                                   │
 │  ┌──────────────────────────────┐                           │
 │  │          BRONZE              │                           │
-│  │  syslog_raw  │  snmp_raw     │                           │
+│  │  logs_raw  │  metrics_raw    │                           │
 │  └──────────────┬───────────────┘                           │
 │                 │                                            │
 │                 ▼                                            │
@@ -61,7 +71,7 @@ This demo showcases:
                         ▼
               ┌─────────────────┐
               │  AWS Databricks │
-              │   IMS Data      │
+              │   Cross-Cloud   │
               └─────────────────┘
 ```
 
@@ -71,33 +81,36 @@ This demo showcases:
 GCPNetworkPerfETLDemo/
 ├── infrastructure/           # GCP infrastructure setup
 │   ├── gcp_sftp_setup.sh    # GCE VM and networking setup
-│   ├── gcp_gcs_setup.sh     # GCS bucket setup for SNMP
+│   ├── gcp_gcs_setup.sh     # GCS bucket setup for metrics
 │   ├── configure_sftp.sh    # SFTP server configuration
-│   ├── telco-generator.service  # Systemd service for data generator
+│   ├── telco-generator.service   # Systemd service (Telco)
+│   ├── retail-generator.service  # Systemd service (Retail)
 │   └── sftp_config.env      # Generated config (after setup)
 │
 ├── scripts/
-│   ├── telco_data_generator.py  # Synthetic data generator (syslog→SFTP, SNMP→GCS)
-│   └── schema_evolution_demo.py # Schema evolution demo script
+│   ├── telco_data_generator.py   # Telco: Network performance data
+│   ├── retail_data_generator.py  # Retail: Store performance data
+│   ├── ims_data_generator.py     # Cross-cloud IMS data
+│   └── schema_evolution_demo.py  # Schema evolution demo script
 │
-├── databricks/                              # Databricks notebooks
+├── databricks/                              # Telco Databricks notebooks
 │   ├── 00_setup_sftp_connection.py          # Unity Catalog SFTP connection
-│   ├── 00_1_setup_gcs_connection.py         # Unity Catalog GCS connection + file events
-│   ├── 01_0_bronze_ingestion_combined_reference.py  # Combined ingestion (reference)
 │   ├── 01_1_bronze_ingestion_syslog.py      # Syslog Auto Loader from SFTP
-│   ├── 01_2_bronze_ingestion_snmp.py        # SNMP Auto Loader from GCS (JSON)
+│   ├── 01_2_bronze_ingestion_snmp.py        # SNMP Auto Loader from GCS
 │   ├── 01_3_bronze_monitor.py               # Bronze layer monitoring
-│   ├── 02_silver_pipeline.sql               # Lakeflow DLT Silver (SQL)
-│   ├── 02_silver_pipeline_python_reference.py  # Silver pipeline (Python reference)
-│   ├── 03_gold_pipeline.sql                 # Lakeflow DLT Gold (SQL)
-│   ├── 03_gold_pipeline_python_reference.py # Gold pipeline (Python reference)
-│   └── 04_metric_views.sql                  # Unity Catalog metric views
+│   ├── 02_silver_pipeline.sql               # Lakeflow DLT Silver
+│   ├── 03_gold_pipeline.sql                 # Lakeflow DLT Gold
+│   ├── 04_metric_views.sql                  # Unity Catalog metric views
+│   ├── 05_genie_space_setup.sql             # Genie AI assistant setup
+│   ├── 06_ims_cross_cloud_analytics.sql     # Cross-cloud analytics
+│   ├── aws/                                 # AWS cross-cloud notebooks
+│   ├── retail/                              # Retail industry notebooks
+│   └── archived/                            # Reference implementations
 │
 ├── docs/                     # Documentation
 │   ├── architecture.md       # Architecture details
-│   ├── demo_script.md        # Demo presentation guide
-│   ├── tco_analysis.md       # TCO comparison
-│   └── performance_metrics.md  # Performance benchmarks
+│   ├── data_generator_control.md  # Generator control guide
+│   └── performance_metrics.md     # Performance benchmarks
 │
 └── README.md                 # This file
 ```
@@ -119,7 +132,7 @@ git clone <repository-url>
 cd GCPNetworkPerfETLDemo
 
 # Set your GCP project ID
-export GCP_PROJECT_ID="your-gcp-project-id"
+export GCP_PROJECT_ID="<your-gcp-project-id>"
 
 # Make scripts executable
 chmod +x infrastructure/*.sh
@@ -135,23 +148,28 @@ cd infrastructure
 ### Step 2: Configure SFTP Server
 
 ```bash
+# Set the SFTP password (REQUIRED)
+export SFTP_PASSWORD="<your-secure-password>"
+
 # Copy configuration script to the VM
-gcloud compute scp configure_sftp.sh telco-sftp-server:~/ --zone=us-central1-a
+gcloud compute scp configure_sftp.sh <vm-name>:~/ --zone=us-central1-a
 
 # SSH into the VM and run configuration
-gcloud compute ssh telco-sftp-server --zone=us-central1-a --command='chmod +x ~/configure_sftp.sh && sudo ~/configure_sftp.sh'
+gcloud compute ssh <vm-name> --zone=us-central1-a --command='chmod +x ~/configure_sftp.sh && sudo SFTP_PASSWORD=$SFTP_PASSWORD ~/configure_sftp.sh'
 
-# Copy data generator to the VM
-gcloud compute scp ../scripts/telco_data_generator.py telco-sftp-server:/opt/telco-generator/ --zone=us-central1-a
+# Copy data generator to the VM (choose your flavor)
+# For Telco:
+gcloud compute scp ../scripts/telco_data_generator.py <vm-name>:/opt/telco-generator/ --zone=us-central1-a
+# For Retail:
+gcloud compute scp ../scripts/retail_data_generator.py <vm-name>:/opt/retail-generator/ --zone=us-central1-a
 
-# Install systemd service
-gcloud compute scp telco-generator.service telco-sftp-server:/tmp/ --zone=us-central1-a
-gcloud compute ssh telco-sftp-server --zone=us-central1-a --command='sudo mv /tmp/telco-generator.service /etc/systemd/system/ && sudo systemctl daemon-reload && sudo systemctl enable telco-generator && sudo systemctl start telco-generator'
+# Install and start the systemd service
+# (See infrastructure/*-generator.service files)
 ```
 
 ### Step 3: Set Up Databricks
 
-#### 3.1: Update Configuration
+#### 3.1: Configure Secrets
 
 Configure secrets in Databricks for SFTP connection:
 ```python
@@ -162,34 +180,39 @@ Configure secrets in Databricks for SFTP connection:
 
 #### 3.2: Run Notebooks in Order
 
-1. **00_setup_sftp_connection.py**: Creates Unity Catalog connection and schemas
-2. **01_1_bronze_ingestion_syslog.py**: Starts syslog Auto Loader (separate compute)
-3. **01_2_bronze_ingestion_snmp.py**: Starts SNMP Auto Loader (separate compute)
-4. **01_3_bronze_monitor.py**: Monitor ingestion progress, enable CDF
-5. **02_silver_pipeline.sql**: Create DLT pipeline for silver layer (SQL syntax)
-6. **03_gold_pipeline.sql**: Create DLT pipeline for gold layer (SQL syntax)
-7. **04_metric_views.sql**: Create Unity Catalog metric views
+**For Telco flavor:**
+1. `00_setup_sftp_connection.py`: Creates Unity Catalog connection and schemas
+2. `01_1_bronze_ingestion_syslog.py`: Starts syslog Auto Loader
+3. `01_2_bronze_ingestion_snmp.py`: Starts SNMP Auto Loader
+4. `01_3_bronze_monitor.py`: Monitor ingestion progress
+5. `02_silver_pipeline.sql`: Create DLT pipeline for silver layer
+6. `03_gold_pipeline.sql`: Create DLT pipeline for gold layer
+7. `04_metric_views.sql`: Create Unity Catalog metric views
 
-> **Note**: Python reference notebooks (`*_python_reference.py`) are available for developers who prefer Python syntax for DLT pipelines.
+**For Retail flavor:**
+1. `retail/00_setup_retail_connection.py`: Creates Unity Catalog connection
+2. `retail/01_1_bronze_ingestion_events.py`: Starts events Auto Loader
+3. `retail/01_2_bronze_ingestion_metrics.py`: Starts metrics Auto Loader
+4. `retail/02_silver_pipeline_retail.sql`: Silver DLT pipeline
+5. `retail/03_gold_pipeline_retail.sql`: Gold DLT pipeline
+6. `retail/04_metric_views_retail.sql`: Retail metric views
 
 #### 3.3: Create Delta Live Tables Pipelines
 
 **Silver Pipeline:**
 1. Go to Workflows → Delta Live Tables → Create Pipeline
-2. Pipeline Name: `telco_silver_pipeline`
-3. Notebook: `databricks/02_silver_pipeline.sql`
-4. Target: `telus_networkperf.silver`
+2. Pipeline Name: `<flavor>_silver_pipeline`
+3. Notebook: `databricks/02_silver_pipeline.sql` (or retail variant)
+4. Target: `<catalog>.<schema>.silver`
 5. Enable: Auto Scaling, Schema Evolution
 6. Start Pipeline
 
 **Gold Pipeline:**
-1. Create Pipeline: `telco_gold_pipeline`
-2. Notebook: `databricks/03_gold_pipeline.sql`
-3. Target: `telus_networkperf.gold`
+1. Create Pipeline: `<flavor>_gold_pipeline`
+2. Notebook: `databricks/03_gold_pipeline.sql` (or retail variant)
+3. Target: `<catalog>.<schema>.gold`
 4. Enable: Auto Scaling
 5. Start Pipeline
-
-> **Note**: For Python-based DLT pipelines, use `02_silver_pipeline_python_reference.py` and `03_gold_pipeline_python_reference.py` instead.
 
 ### Step 4: Monitor and Visualize
 
@@ -224,61 +247,44 @@ Configure secrets in Databricks for SFTP connection:
 - Ready for cross-cloud Delta Sharing
 
 ### 5. Real-Time Monitoring
-- Network KPI metrics (latency, packet loss, throughput, jitter, error rate)
+
+**Telco KPIs:**
+- Network latency, packet loss, throughput, jitter, error rate
 - Device health scoring
 - Geographic performance analysis
-- Automated alerting thresholds
 
-## Demo Script
+**Retail KPIs:**
+- Sales metrics, inventory levels, customer flow
+- Store performance scoring
+- Regional analytics
 
-See [docs/demo_script.md](docs/demo_script.md) for a complete demo walkthrough including:
-- Narrative flow
-- Key talking points
-- Live demonstrations
-- Q&A preparation
+## Industry-Specific Metrics
 
-## TCO Analysis
+### Telco Network Performance KPIs
 
-Detailed cost comparison between Databricks and BigQuery:
-- See [docs/tco_analysis.md](docs/tco_analysis.md)
-- 40-60% cost reduction for typical telco workloads
-- Reduced operational overhead
-- Unified platform savings
+| Metric | Description | Thresholds |
+|--------|-------------|------------|
+| **Latency** (ms) | Network round-trip time | Normal: <50ms, Warning: 50-100ms, Critical: >150ms |
+| **Packet Loss** (%) | Percentage of lost packets | Acceptable: <0.5%, Warning: 0.5-1%, Critical: >3% |
+| **Throughput** (Mbps) | Data transfer rate | Low: <1000, Normal: 1000-5000, High: >9000 |
+| **Jitter** (ms) | Variation in latency | Good: <10ms, Degraded: 20-40ms, Poor: >40ms |
+| **Error Rate** | Errors per time window | Low: <100, Medium: 100-400, Critical: >800 |
 
-## Performance Metrics
+### Retail Store Performance KPIs
 
-End-to-end latency benchmarks:
-- See [docs/performance_metrics.md](docs/performance_metrics.md)
-- File landing to query: < 2 minutes
-- Compare to traditional ETL: 15-30 minutes
-- Real-time dashboard updates
-
-## Cross-Cloud Integration
-
-The gold layer is prepared for Delta Sharing with AWS Databricks:
-
-```sql
--- Example join with IMS data from AWS (via Delta Share)
-SELECT 
-  d.device_id,
-  d.location,
-  d.current_latency_ms,
-  i.ims_session_id,
-  i.subscriber_id
-FROM telus_networkperf.gold.dim_devices d
-INNER JOIN aws_delta_share.ims_gold_table i
-  ON d.device_id = i.device_id
-  AND d.location = i.location
-WHERE d.is_active = TRUE;
-```
+| Metric | Description | Thresholds |
+|--------|-------------|------------|
+| **Sales/Hour** | Transactions per hour | Low: <50, Normal: 50-200, High: >200 |
+| **Conversion Rate** (%) | Visitors to buyers | Poor: <5%, Average: 5-15%, Good: >15% |
+| **Inventory Turnover** | Stock movement rate | Slow: <2, Normal: 2-6, Fast: >6 |
+| **Customer Wait Time** (min) | Average checkout time | Good: <3, Fair: 3-7, Poor: >7 |
+| **Store Uptime** (%) | POS system availability | Critical: <99%, Warning: 99-99.9%, Good: >99.9% |
 
 ## Documentation
 
 - [Architecture Details](docs/architecture.md)
-- [Demo Script](docs/demo_script.md)
-- [TCO Analysis](docs/tco_analysis.md)
-- [Performance Metrics](docs/performance_metrics.md)
 - [Data Generator Control Guide](docs/data_generator_control.md)
+- [Performance Metrics](docs/performance_metrics.md)
 
 ## Configuration
 
@@ -287,46 +293,19 @@ WHERE d.is_active = TRUE;
 Adjust the data generation rate:
 
 ```bash
-# SSH into the SFTP VM
-gcloud compute ssh telco-sftp-server --zone=us-central1-a
+# SSH into the VM
+gcloud compute ssh <vm-name> --zone=us-central1-a
 
 # Edit the systemd service
-sudo nano /etc/systemd/system/telco-generator.service
+sudo nano /etc/systemd/system/<flavor>-generator.service
 
 # Change --files-per-minute parameter (default: 1000)
 # Restart the service
-sudo systemctl restart telco-generator
+sudo systemctl restart <flavor>-generator
 
 # Check status
-sudo systemctl status telco-generator
+sudo systemctl status <flavor>-generator
 ```
-
-### Network KPIs Monitored
-
-1. **Latency** (ms): Network round-trip time
-   - Normal: < 50ms
-   - Warning: 50-100ms
-   - Critical: > 150ms
-
-2. **Packet Loss** (%): Percentage of lost packets
-   - Acceptable: < 0.5%
-   - Warning: 0.5-1%
-   - Critical: > 3%
-
-3. **Throughput** (Mbps): Data transfer rate
-   - Low: < 1000 Mbps
-   - Normal: 1000-5000 Mbps
-   - High: > 9000 Mbps
-
-4. **Jitter** (ms): Variation in latency
-   - Good QoS: < 10ms
-   - Degraded: 20-40ms
-   - Poor: > 40ms
-
-5. **Error Rate**: Errors per time window
-   - Low: < 100
-   - Medium: 100-400
-   - Critical: > 800
 
 ## Troubleshooting
 
@@ -334,13 +313,13 @@ sudo systemctl status telco-generator
 
 ```bash
 # Test SFTP connectivity
-sftp telco_user@<SFTP_IP>
+sftp <username>@<SFTP_IP>
 
 # Check SFTP server logs
-gcloud compute ssh telco-sftp-server --zone=us-central1-a --command='sudo journalctl -u sshd -f'
+gcloud compute ssh <vm-name> --zone=us-central1-a --command='sudo journalctl -u sshd -f'
 
 # Check data generator logs
-gcloud compute ssh telco-sftp-server --zone=us-central1-a --command='sudo journalctl -u telco-generator -f'
+gcloud compute ssh <vm-name> --zone=us-central1-a --command='sudo journalctl -u <flavor>-generator -f'
 ```
 
 ### Databricks Pipeline Issues
@@ -348,13 +327,13 @@ gcloud compute ssh telco-sftp-server --zone=us-central1-a --command='sudo journa
 ```bash
 # Check Auto Loader progress
 # In Databricks notebook:
-display(spark.sql("DESCRIBE HISTORY telus_networkperf.bronze.syslog_raw"))
+display(spark.sql("DESCRIBE HISTORY <catalog>.<schema>.bronze.<table>"))
 
 # Check DLT pipeline events
 # Go to: Workflows → Delta Live Tables → [Pipeline] → Events
 
 # Verify Unity Catalog lineage
-# Go to: Catalog → telus_networkperf → [table] → Lineage
+# Go to: Catalog → <catalog> → [table] → Lineage
 ```
 
 ## Support
@@ -373,5 +352,3 @@ This demo is provided as-is for educational and demonstration purposes.
 - RFC 5424 Syslog Protocol
 - Databricks Auto Loader and DLT documentation
 - GCP Compute Engine documentation
-
-# databricks-telco-network-perf

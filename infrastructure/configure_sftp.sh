@@ -10,7 +10,7 @@ set -e
 
 # Configuration
 SFTP_USER="telco_user"
-SFTP_PASSWORD="${SFTP_PASSWORD:-CHANGE_ME_IN_PRODUCTION}"  # Set via environment variable or change this!
+SFTP_PASSWORD="${SFTP_PASSWORD:?ERROR: SFTP_PASSWORD environment variable must be set}"  # REQUIRED: Set via environment variable
 SFTP_GROUP="sftpusers"
 SFTP_BASE="/sftp"
 SFTP_TELCO_BASE="/sftp/telco"

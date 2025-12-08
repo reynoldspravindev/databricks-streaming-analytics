@@ -39,13 +39,13 @@ print(f"  SNMP: {BRONZE_SNMP_TABLE}")
 # Enable CDF on bronze tables for downstream Delta Live Tables
 try:
     spark.sql(f"ALTER TABLE {BRONZE_SYSLOG_TABLE} SET TBLPROPERTIES (delta.enableChangeDataFeed = true)")
-    print(f"✓ Change Data Feed enabled on {BRONZE_SYSLOG_TABLE}")
+    print(f"[OK] Change Data Feed enabled on {BRONZE_SYSLOG_TABLE}")
 except Exception as e:
     print(f"Note: {e}")
 
 try:
     spark.sql(f"ALTER TABLE {BRONZE_SNMP_TABLE} SET TBLPROPERTIES (delta.enableChangeDataFeed = true)")
-    print(f"✓ Change Data Feed enabled on {BRONZE_SNMP_TABLE}")
+    print(f"[OK] Change Data Feed enabled on {BRONZE_SNMP_TABLE}")
 except Exception as e:
     print(f"Note: {e}")
 
@@ -136,10 +136,10 @@ rescued_data = spark.table(BRONZE_SNMP_TABLE).filter(col("_rescued_data").isNotN
 rescued_count = rescued_data.count()
 
 if rescued_count > 0:
-    print(f"⚠️  Warning: {rescued_count} records with rescued data found")
+    print(f"[WARNING] {rescued_count} records with rescued data found")
     display(rescued_data.limit(10))
 else:
-    print("✓ No rescued data - all records parsed successfully")
+    print("[OK] No rescued data - all records parsed successfully")
 
 # COMMAND ----------
 
