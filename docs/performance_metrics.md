@@ -152,10 +152,10 @@ TOTAL: 1.2-2.2 minutes
 | Scenario | GCP Native (files/min) | Databricks (files/min) | Winner |
 |----------|------------------------|------------------------|--------|
 | Normal Load (5K files/min) | 5,000 | 5,000 | Tie |
-| 2x Load (2K files/min) | 1,800 (lag) | 2,000 | Databricks |
-| 5x Load (5K files/min) | 3,500 (lag) | 5,000 | Databricks |
-| 10x Load (10K files/min) | 5,000 (backlog) | 10,000 | Databricks |
-| Max Capacity | ~5,000 (limited) | 20,000+ (scalable) | Databricks |
+| 2x Load (10K files/min) | 9,000 (lag) | 10,000 | Databricks |
+| 5x Load (25K files/min) | 17,500 (lag) | 25,000 | Databricks |
+| 10x Load (50K files/min) | 25,000 (backlog) | 50,000 | Databricks |
+| Max Capacity | ~25,000 (limited) | 100,000+ (scalable) | Databricks |
 
 ### Throughput Over Time
 
@@ -314,10 +314,10 @@ GROUP BY hour, metric_name
 | Load | GCP Native Response | Databricks Response |
 |------|---------------------|---------------------|
 | 1x (5K files/min) | Normal (100% processed) | Normal (100% processed) |
-| 2x (2K files/min) | Slight lag (90% processed) | Normal (100% processed) |
-| 5x (5K files/min) | Significant lag (70% processed) | Normal (100% processed) |
-| 10x (10K files/min) | Backlog builds (50% processed) | Normal (100% processed) |
-| 20x (20K files/min) | System overwhelmed (25%) | Auto-scales (100% processed) |
+| 2x (10K files/min) | Slight lag (90% processed) | Normal (100% processed) |
+| 5x (25K files/min) | Significant lag (70% processed) | Normal (100% processed) |
+| 10x (50K files/min) | Backlog builds (50% processed) | Normal (100% processed) |
+| 20x (100K files/min) | System overwhelmed (25%) | Auto-scales (100% processed) |
 
 ### Vertical Scaling (Complex Queries)
 
