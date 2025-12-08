@@ -172,11 +172,35 @@ Configure secrets in Databricks for SFTP connection:
 
 ## Key Features Demonstrated
 
-### 1. Auto Loader for SFTP
-- Native SFTP connector with Unity Catalog integration
-- Automatic schema inference and evolution
-- Exactly-once processing guarantees
-- Support for structured (CSV) and unstructured (text) data
+### 1. Auto Loader for SFTP - Simplified File Ingestion
+
+Auto Loader with native SFTP support dramatically simplifies file ingestion from legacy systems:
+
+**Before Auto Loader (Traditional Approach):**
+- Custom scripts to poll SFTP servers for new files
+- Manual file tracking to avoid duplicate processing
+- Complex error handling and retry logic
+- Separate orchestration (Airflow/Composer) to schedule jobs
+- Schema changes require code updates and redeployment
+
+**With Databricks Auto Loader for SFTP:**
+- **Zero custom code**: Just point to the SFTP path and start streaming
+- **Automatic file tracking**: Built-in checkpointing ensures exactly-once processing
+- **Schema inference & evolution**: Automatically detects new columns without pipeline restarts
+- **Native Unity Catalog integration**: Full lineage, governance, and access control
+- **Continuous or batch modes**: Run continuously or trigger on-demand
+- **Built-in retry logic**: Handles transient failures automatically
+
+```python
+# That's all you need - no polling scripts, no file tracking, no orchestration!
+df = (spark.readStream
+    .format("cloudFiles")
+    .option("cloudFiles.format", "json")
+    .option("cloudFiles.connectionName", "my_sftp_connection")  # Unity Catalog connection
+    .option("cloudFiles.schemaEvolutionMode", "addNewColumns")
+    .load("sftp://server/path/to/files/")
+)
+```
 
 ### 2. Medallion Architecture
 - **Bronze**: Raw data with full lineage

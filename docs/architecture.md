@@ -53,6 +53,21 @@ This document provides a detailed technical architecture of the real-time perfor
 
 ### 3. Ingestion Layer (Bronze)
 
+**Why Auto Loader for SFTP Changes Everything:**
+
+Traditional SFTP ingestion requires significant engineering effort:
+
+| Challenge | Traditional Approach | Auto Loader for SFTP |
+|-----------|---------------------|----------------------|
+| **File Discovery** | Custom polling scripts, cron jobs | Automatic continuous monitoring |
+| **Duplicate Prevention** | Manual file tracking tables | Built-in checkpointing |
+| **Schema Changes** | Code changes + redeployment | Automatic schema evolution |
+| **Error Handling** | Custom retry logic | Built-in fault tolerance |
+| **Orchestration** | Airflow/Composer DAGs | No orchestration needed |
+| **Governance** | Manual audit logging | Unity Catalog lineage |
+| **Scalability** | Manual parallelization | Auto-scales with cluster |
+| **Lines of Code** | 500-1000+ lines | ~20 lines |
+
 **Auto Loader Configuration:**
 
 | Feature | Logs | Metrics |
@@ -62,6 +77,14 @@ This document provides a detailed technical architecture of the real-time perfor
 | Schema Evolution | addNewColumns | addNewColumns |
 | Trigger Mode | availableNow / continuous | availableNow / continuous |
 | Checkpoint | Unity Catalog Volume | Unity Catalog Volume |
+
+**Key Auto Loader Benefits:**
+
+1. **Incremental Processing**: Only processes new files since last checkpoint
+2. **Exactly-Once Semantics**: Guarantees no duplicate or missed files
+3. **Schema Evolution**: Automatically adds new columns without restarts
+4. **Unity Catalog Connection**: Credentials secured, full lineage tracked
+5. **Rescue Data**: Malformed records saved for debugging, not lost
 
 **Data Governance:**
 - Unity Catalog: All tables registered
