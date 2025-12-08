@@ -21,7 +21,7 @@ This document compares performance metrics between **Databricks on GCP** and the
 ### Test Environment
 
 **Data Characteristics:**
-- **Volume**: 1,000 files/minute (500 logs, 500 metrics)
+- **Volume**: 5,000 files/minute (2,500 logs, 2,500 metrics)
 - **File Size**: 10-50 KB per file
 - **Daily Volume**: 150 GB/day
 - **Entities**: 100 simulated entities (devices, stores, etc.)
@@ -151,7 +151,7 @@ TOTAL: 1.2-2.2 minutes
 
 | Scenario | GCP Native (files/min) | Databricks (files/min) | Winner |
 |----------|------------------------|------------------------|--------|
-| Normal Load (1K files/min) | 1,000 | 1,000 | Tie |
+| Normal Load (5K files/min) | 5,000 | 5,000 | Tie |
 | 2x Load (2K files/min) | 1,800 (lag) | 2,000 | Databricks |
 | 5x Load (5K files/min) | 3,500 (lag) | 5,000 | Databricks |
 | 10x Load (10K files/min) | 5,000 (backlog) | 10,000 | Databricks |
@@ -313,7 +313,7 @@ GROUP BY hour, metric_name
 
 | Load | GCP Native Response | Databricks Response |
 |------|---------------------|---------------------|
-| 1x (1K files/min) | Normal (100% processed) | Normal (100% processed) |
+| 1x (5K files/min) | Normal (100% processed) | Normal (100% processed) |
 | 2x (2K files/min) | Slight lag (90% processed) | Normal (100% processed) |
 | 5x (5K files/min) | Significant lag (70% processed) | Normal (100% processed) |
 | 10x (10K files/min) | Backlog builds (50% processed) | Normal (100% processed) |

@@ -296,8 +296,3 @@ For issues or questions:
 
 This demo is provided as-is for educational and demonstration purposes.
 
-## Acknowledgments
-
-- RFC 5424 Syslog Protocol
-- Databricks Auto Loader and DLT documentation
-- GCP Compute Engine documentation
