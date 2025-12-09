@@ -72,6 +72,13 @@ GCPNetworkPerfETLDemo/
 - Databricks workspace on GCP with Unity Catalog enabled
 - `gcloud` CLI installed and configured
 - Databricks CLI configured (optional)
+- **Unity Catalog External Location** for GCS bucket access (required for SNMP/GCS ingestion):
+  - Create a storage credential using a GCP service account with `storage.objectViewer` permissions on your GCS bucket
+  - Create an external location pointing to your GCS bucket path (e.g., `gs://your-bucket/snmp/`)
+  - **Optional**: Enable file notifications for low-latency ingestion:
+    - **Managed file events** (recommended): Set `cloudFiles.useManagedFileEvents=true` - Databricks manages Pub/Sub automatically
+    - **Unmanaged file events**: Configure your own GCS Pub/Sub notification and provide the subscription path
+  - Reference: [Databricks File Notification Mode](https://docs.databricks.com/gcp/en/ingestion/cloud-object-storage/auto-loader/file-notification-mode)
 
 ### Step 1: Deploy SFTP Server on GCP
 

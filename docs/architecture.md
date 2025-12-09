@@ -92,6 +92,28 @@ Traditional SFTP ingestion requires significant engineering effort:
 - Lineage: Automatic tracking
 - Access Control: Fine-grained permissions
 
+**GCS External Location Prerequisites:**
+
+For ingesting data from Google Cloud Storage (e.g., SNMP metrics), a Unity Catalog External Location is required:
+
+| Component | Description | Required |
+|-----------|-------------|----------|
+| **Storage Credential** | GCP service account with `storage.objectViewer` role on the GCS bucket | Yes |
+| **External Location** | UC object mapping the GCS path (e.g., `gs://bucket/snmp/`) to a credential | Yes |
+| **File Notifications** | Pub/Sub notifications for low-latency file discovery | Optional |
+
+**File Notification Modes:**
+
+| Mode | Configuration | Latency | Management |
+|------|---------------|---------|------------|
+| **Directory Listing** (default) | No extra setup | Higher (~30s) | None |
+| **Managed File Events** | `cloudFiles.useManagedFileEvents=true` | Low (~5s) | Databricks manages Pub/Sub |
+| **Unmanaged File Events** | Provide `cloudFiles.queueUrl` with Pub/Sub subscription | Low (~5s) | User manages Pub/Sub |
+
+> **Note:** File notification mode (managed or unmanaged) significantly reduces ingestion latency by using GCS Pub/Sub notifications instead of directory listing. For production workloads with high file volumes, managed file events are recommended.
+
+Reference: [Databricks File Notification Mode](https://docs.databricks.com/gcp/en/ingestion/cloud-object-storage/auto-loader/file-notification-mode)
+
 ### 4. Transformation Layer (Silver)
 
 **Delta Live Tables Features:**
