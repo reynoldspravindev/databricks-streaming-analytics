@@ -10,7 +10,7 @@ set -e
 
 # Configuration
 SFTP_USER="telco_user"
-SFTP_PASSWORD="${SFTP_PASSWORD:?ERROR: SFTP_PASSWORD environment variable must be set}"  # REQUIRED: Set via environment variable
+SFTP_PASSWORD="${1:?ERROR: SFTP_PASSWORD must be provided as first argument. Usage: $0 <password>}"
 SFTP_GROUP="sftpusers"
 SFTP_BASE="/sftp"
 SFTP_TELCO_BASE="/sftp/telco"
@@ -19,6 +19,7 @@ SFTP_SNMP_DIR="/sftp/telco/snmp"
 
 echo "=========================================="
 echo "SFTP Server Configuration"
+echo "Usage: $0 <sftp_password>"
 echo "=========================================="
 
 # Check if running as root

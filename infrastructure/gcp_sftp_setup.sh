@@ -120,17 +120,25 @@ echo "External IP: $EXTERNAL_IP"
 echo "Zone: $ZONE"
 echo ""
 echo "Next Steps:"
-echo "1. Copy and run the configuration script on the VM:"
+echo "1. Set your SFTP password and configure the server:"
+echo "   export SFTP_PASSWORD='<your-secure-password>'"
 echo "   gcloud compute scp infrastructure/configure_sftp.sh $VM_NAME:~/ --zone=$ZONE"
-echo "   gcloud compute ssh $VM_NAME --zone=$ZONE --command='chmod +x ~/configure_sftp.sh && sudo ~/configure_sftp.sh'"
+echo "   gcloud compute ssh $VM_NAME --zone=$ZONE --command=\"chmod +x ~/configure_sftp.sh && sudo ~/configure_sftp.sh '\${SFTP_PASSWORD}'\""
 echo ""
 echo "2. Update your Databricks connection with this IP: $EXTERNAL_IP"
 echo ""
 echo "Save this IP address for later use!"
 echo "=========================================="
 
+# Determine correct config file path
+if [ "$(basename "$PWD")" = "infrastructure" ]; then
+    CONFIG_FILE="sftp_config.env"
+else
+    CONFIG_FILE="infrastructure/sftp_config.env"
+fi
+
 # Save configuration to file
-cat > infrastructure/sftp_config.env <<EOF
+cat > "$CONFIG_FILE" <<EOF
 # SFTP Server Configuration
 # Generated on $(date)
 
@@ -145,5 +153,5 @@ GCP_ZONE=$ZONE
 VM_NAME=$VM_NAME
 EOF
 
-echo "Configuration saved to infrastructure/sftp_config.env"
+echo "Configuration saved to $CONFIG_FILE"
 
