@@ -64,10 +64,19 @@ mkdir -p $SFTP_TELCO_BASE
 mkdir -p $SFTP_SYSLOG_DIR
 mkdir -p $SFTP_SNMP_DIR
 
+# Create retail directories
+SFTP_RETAIL_BASE="/sftp/retail"
+SFTP_RETAIL_EVENTS_DIR="/sftp/retail/events"
+SFTP_RETAIL_METRICS_DIR="/sftp/retail/metrics"
+mkdir -p $SFTP_RETAIL_BASE
+mkdir -p $SFTP_RETAIL_EVENTS_DIR
+mkdir -p $SFTP_RETAIL_METRICS_DIR
+
 # Set permissions (root owns base, user owns subdirectories)
 chown root:root $SFTP_BASE
 chmod 755 $SFTP_BASE
 
+# Telco directories
 chown root:root $SFTP_TELCO_BASE
 chmod 755 $SFTP_TELCO_BASE
 
@@ -76,6 +85,16 @@ chmod 755 $SFTP_SYSLOG_DIR
 
 chown $SFTP_USER:$SFTP_GROUP $SFTP_SNMP_DIR
 chmod 755 $SFTP_SNMP_DIR
+
+# Retail directories
+chown root:root $SFTP_RETAIL_BASE
+chmod 755 $SFTP_RETAIL_BASE
+
+chown $SFTP_USER:$SFTP_GROUP $SFTP_RETAIL_EVENTS_DIR
+chmod 755 $SFTP_RETAIL_EVENTS_DIR
+
+chown $SFTP_USER:$SFTP_GROUP $SFTP_RETAIL_METRICS_DIR
+chmod 755 $SFTP_RETAIL_METRICS_DIR
 
 # Backup original SSH config
 if [ ! -f /etc/ssh/sshd_config.backup ]; then
@@ -122,15 +141,22 @@ systemctl enable ssh
 echo "Installing Python and dependencies..."
 apt-get install -y python3 python3-pip python3-venv
 
-# Create Python virtual environment for data generator
-echo "Creating Python virtual environment..."
+# Create Python virtual environments for data generators
+echo "Creating Python virtual environments for telco and retail generators..."
 mkdir -p /opt/telco-generator
-python3 -m venv /opt/telco-generator/venv
+mkdir -p /opt/retail-generator
 
-# Install Python packages for GCS support
-echo "Installing Python packages for GCS..."
+# Create venv for telco generator
+python3 -m venv /opt/telco-generator/venv
+echo "Installing Python packages for telco generator..."
 /opt/telco-generator/venv/bin/pip install --upgrade pip
 /opt/telco-generator/venv/bin/pip install google-cloud-storage
+
+# Create venv for retail generator
+python3 -m venv /opt/retail-generator/venv
+echo "Installing Python packages for retail generator..."
+/opt/retail-generator/venv/bin/pip install --upgrade pip
+/opt/retail-generator/venv/bin/pip install google-cloud-storage
 
 # Display status
 echo ""
@@ -139,8 +165,14 @@ echo "SFTP Server Configuration Complete!"
 echo "=========================================="
 echo "SFTP User: $SFTP_USER"
 echo "SFTP Password: $SFTP_PASSWORD"
-echo "Syslog Directory: $SFTP_SYSLOG_DIR"
-echo "SNMP Directory: $SFTP_SNMP_DIR"
+echo ""
+echo "Telco Directories:"
+echo "  Syslog: $SFTP_SYSLOG_DIR"
+echo "  SNMP: $SFTP_SNMP_DIR"
+echo ""
+echo "Retail Directories:"
+echo "  Events: $SFTP_RETAIL_EVENTS_DIR"
+echo "  Metrics: $SFTP_RETAIL_METRICS_DIR"
 echo ""
 echo "SSH Service Status:"
 systemctl status ssh --no-pager | head -n 5
@@ -149,8 +181,10 @@ echo "Test SFTP connection with:"
 echo "  sftp $SFTP_USER@\$(hostname -I | awk '{print \$1}')"
 echo ""
 echo "Next Steps:"
-echo "1. Copy the data generator script to /opt/telco-generator/"
-echo "2. Install the systemd service"
+echo "1. Copy the data generator script(s):"
+echo "   - Telco: /opt/telco-generator/telco_data_generator.py"
+echo "   - Retail: /opt/retail-generator/retail_data_generator.py"
+echo "2. Install the systemd service (telco-generator.service or retail-generator.service)"
 echo "3. Start the data generator"
 echo "=========================================="
 
