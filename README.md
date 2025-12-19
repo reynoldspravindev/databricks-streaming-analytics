@@ -147,22 +147,22 @@ source gcs_config.env
 export SFTP_PASSWORD="<your-secure-password>"
 
 # VM details are now loaded from sftp_config.env
-# You can verify with: echo $VM_NAME $ZONE $SFTP_HOST
+# You can verify with: echo $VM_NAME $GCP_ZONE $SFTP_HOST
 
 # Copy configuration script to the VM
-gcloud compute scp configure_sftp.sh ${VM_NAME}:~/ --zone=${ZONE}
+gcloud compute scp configure_sftp.sh ${VM_NAME}:~/ --zone=${GCP_ZONE}
 
 # Run the configuration script (password passed as argument)
-gcloud compute ssh ${VM_NAME} --zone=${ZONE} --command="chmod +x ~/configure_sftp.sh && sudo ~/configure_sftp.sh '${SFTP_PASSWORD}'"
+gcloud compute ssh ${VM_NAME} --zone=${GCP_ZONE} --command="chmod +x ~/configure_sftp.sh && sudo ~/configure_sftp.sh '${SFTP_PASSWORD}'"
 
 # Copy data generator to home directory first, then move to /opt
 # For Telco:
-gcloud compute scp ../scripts/telco_data_generator.py ${VM_NAME}:~/ --zone=${ZONE}
-gcloud compute ssh ${VM_NAME} --zone=${ZONE} --command="sudo mv ~/telco_data_generator.py /opt/telco-generator/ && sudo chmod 755 /opt/telco-generator/telco_data_generator.py"
+gcloud compute scp ../scripts/telco_data_generator.py ${VM_NAME}:~/ --zone=${GCP_ZONE}
+gcloud compute ssh ${VM_NAME} --zone=${GCP_ZONE} --command="sudo mv ~/telco_data_generator.py /opt/telco-generator/ && sudo chmod 755 /opt/telco-generator/telco_data_generator.py"
 
 # For Retail (alternative):
-gcloud compute scp ../scripts/retail_data_generator.py ${VM_NAME}:~/ --zone=${ZONE}
-gcloud compute ssh ${VM_NAME} --zone=${ZONE} --command="sudo mv ~/retail_data_generator.py /opt/retail-generator/ && sudo chmod 755 /opt/retail-generator/retail_data_generator.py"
+gcloud compute scp ../scripts/retail_data_generator.py ${VM_NAME}:~/ --zone=${GCP_ZONE}
+gcloud compute ssh ${VM_NAME} --zone=${GCP_ZONE} --command="sudo mv ~/retail_data_generator.py /opt/retail-generator/ && sudo chmod 755 /opt/retail-generator/retail_data_generator.py"
 
 # Configure and install systemd service
 # The GCS_SNMP_PATH is already loaded from gcs_config.env
@@ -170,14 +170,14 @@ sed "s|gs://<YOUR_GCS_BUCKET_NAME>/snmp/|${GCS_SNMP_PATH}|g" telco-generator.ser
 mv telco-generator.service.tmp telco-generator.service
 
 # Copy and install the configured service
-gcloud compute scp telco-generator.service ${VM_NAME}:~/ --zone=${ZONE}
-gcloud compute ssh ${VM_NAME} --zone=${ZONE} --command="sudo mv ~/telco-generator.service /etc/systemd/system/ && sudo systemctl daemon-reload && sudo systemctl enable telco-generator && sudo systemctl start telco-generator"
+gcloud compute scp telco-generator.service ${VM_NAME}:~/ --zone=${GCP_ZONE}
+gcloud compute ssh ${VM_NAME} --zone=${GCP_ZONE} --command="sudo mv ~/telco-generator.service /etc/systemd/system/ && sudo systemctl daemon-reload && sudo systemctl enable telco-generator && sudo systemctl start telco-generator"
 
 # Verify the service is running
-gcloud compute ssh ${VM_NAME} --zone=${ZONE} --command="sudo systemctl status telco-generator"
+gcloud compute ssh ${VM_NAME} --zone=${GCP_ZONE} --command="sudo systemctl status telco-generator"
 
 # Check the logs to ensure data is being generated
-gcloud compute ssh ${VM_NAME} --zone=${ZONE} --command="sudo journalctl -u telco-generator -f"
+gcloud compute ssh ${VM_NAME} --zone=${GCP_ZONE} --command="sudo journalctl -u telco-generator -f"
 
 # Note: For Retail flavor, use retail-generator.service and update the GCS_RETAIL_BUCKET variable
 # The retail service expects /sftp/retail/events directory and metrics in GCS
@@ -343,8 +343,8 @@ df = (spark.readStream
 Adjust the data generation rate:
 
 ```bash
-# SSH into the VM
-gcloud compute ssh <vm-name> --zone=us-central1-a
+# SSH into the VM (use environment variables from sftp_config.env)
+gcloud compute ssh ${VM_NAME} --zone=${GCP_ZONE}
 
 # Edit the systemd service
 sudo nano /etc/systemd/system/<flavor>-generator.service
@@ -362,14 +362,14 @@ sudo systemctl status <flavor>-generator
 ### SFTP Connection Issues
 
 ```bash
-# Test SFTP connectivity
-sftp <username>@<SFTP_IP>
+# Test SFTP connectivity (use values from sftp_config.env)
+sftp ${SFTP_USER}@${SFTP_HOST}
 
 # Check SFTP server logs
-gcloud compute ssh <vm-name> --zone=us-central1-a --command='sudo journalctl -u sshd -f'
+gcloud compute ssh ${VM_NAME} --zone=${GCP_ZONE} --command='sudo journalctl -u sshd -f'
 
 # Check data generator logs
-gcloud compute ssh <vm-name> --zone=us-central1-a --command='sudo journalctl -u <flavor>-generator -f'
+gcloud compute ssh ${VM_NAME} --zone=${GCP_ZONE} --command='sudo journalctl -u <flavor>-generator -f'
 ```
 
 ### Databricks Pipeline Issues
