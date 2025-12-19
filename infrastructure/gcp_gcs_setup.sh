@@ -14,7 +14,9 @@ BUCKET_NAME="${PROJECT_ID}-telco-snmp"
 VM_NAME="telco-sftp-server"
 ZONE="us-central1-a"
 
-# Pub/Sub configuration for file notifications
+# Pub/Sub configuration for file notifications (OPTIONAL)
+# Set ENABLE_PUBSUB=false to skip Pub/Sub setup (use managed file events instead)
+ENABLE_PUBSUB="${ENABLE_PUBSUB:-false}"
 PUBSUB_TOPIC="databricks-auto-ingest-${BUCKET_NAME}"
 PUBSUB_SUBSCRIPTION="${PUBSUB_TOPIC}-sub"
 
@@ -24,7 +26,10 @@ echo "=========================================="
 echo "Project ID: ${PROJECT_ID}"
 echo "Bucket Name: ${BUCKET_NAME}"
 echo "Region: ${REGION}"
-echo "Pub/Sub Topic: ${PUBSUB_TOPIC}"
+echo "Pub/Sub Setup: ${ENABLE_PUBSUB}"
+if [ "$ENABLE_PUBSUB" = "true" ]; then
+  echo "Pub/Sub Topic: ${PUBSUB_TOPIC}"
+fi
 echo "=========================================="
 
 # Set project
@@ -34,7 +39,9 @@ gcloud config set project ${PROJECT_ID}
 # Enable required APIs
 echo "Enabling required APIs..."
 gcloud services enable storage.googleapis.com
-gcloud services enable pubsub.googleapis.com
+if [ "$ENABLE_PUBSUB" = "true" ]; then
+  gcloud services enable pubsub.googleapis.com
+fi
 
 # Create GCS bucket
 echo "Creating GCS bucket: gs://${BUCKET_NAME}..."
@@ -83,62 +90,75 @@ else
     echo "[OK] IAM permissions granted"
 fi
 
-echo ""
-echo "=========================================="
-echo "Setting up Pub/Sub for File Notifications"
-echo "=========================================="
+if [ "$ENABLE_PUBSUB" = "true" ]; then
+  echo ""
+  echo "=========================================="
+  echo "Setting up Pub/Sub for File Notifications"
+  echo "=========================================="
 
-# Create Pub/Sub topic
-echo "Creating Pub/Sub topic: ${PUBSUB_TOPIC}..."
-if gcloud pubsub topics describe ${PUBSUB_TOPIC} --project=${PROJECT_ID} 2>/dev/null; then
-    echo "Topic already exists, skipping creation"
+  # Create Pub/Sub topic
+  echo "Creating Pub/Sub topic: ${PUBSUB_TOPIC}..."
+  if gcloud pubsub topics describe ${PUBSUB_TOPIC} --project=${PROJECT_ID} 2>/dev/null; then
+      echo "Topic already exists, skipping creation"
+  else
+      gcloud pubsub topics create ${PUBSUB_TOPIC} --project=${PROJECT_ID}
+      echo "[OK] Pub/Sub topic created"
+  fi
+
+  # Create Pub/Sub subscription for Auto Loader
+  echo "Creating Pub/Sub subscription: ${PUBSUB_SUBSCRIPTION}..."
+  if gcloud pubsub subscriptions describe ${PUBSUB_SUBSCRIPTION} --project=${PROJECT_ID} 2>/dev/null; then
+      echo "Subscription already exists, skipping creation"
+  else
+      gcloud pubsub subscriptions create ${PUBSUB_SUBSCRIPTION} \
+          --topic=${PUBSUB_TOPIC} \
+          --ack-deadline=60 \
+          --message-retention-duration=7d \
+          --project=${PROJECT_ID}
+      echo "[OK] Pub/Sub subscription created"
+  fi
+
+  # Create GCS notification to Pub/Sub topic
+  echo "Creating GCS notification to Pub/Sub..."
+  # Check if notification already exists
+  EXISTING_NOTIFICATION=$(gsutil notification list gs://${BUCKET_NAME} 2>/dev/null | grep "${PUBSUB_TOPIC}" || echo "")
+  if [ -n "${EXISTING_NOTIFICATION}" ]; then
+      echo "Notification already exists, skipping creation"
+  else
+      gsutil notification create \
+          -t projects/${PROJECT_ID}/topics/${PUBSUB_TOPIC} \
+          -f json \
+          -e OBJECT_FINALIZE \
+          -p snmp/ \
+          gs://${BUCKET_NAME}
+      echo "[OK] GCS notification created"
+  fi
+
+  # Get the GCS service account for the project
+  echo ""
+  echo "Getting GCS service account..."
+  GCS_SA=$(gsutil kms serviceaccount -p ${PROJECT_ID})
+  echo "GCS Service Account: ${GCS_SA}"
+
+  # Grant GCS service account permission to publish to Pub/Sub topic
+  echo "Granting GCS service account permission to publish to Pub/Sub..."
+  gcloud pubsub topics add-iam-policy-binding ${PUBSUB_TOPIC} \
+      --member="serviceAccount:${GCS_SA}" \
+      --role="roles/pubsub.publisher" \
+      --project=${PROJECT_ID} 2>/dev/null || echo "Policy binding may already exist"
+  echo "[OK] Pub/Sub permissions configured"
 else
-    gcloud pubsub topics create ${PUBSUB_TOPIC} --project=${PROJECT_ID}
-    echo "[OK] Pub/Sub topic created"
+  echo ""
+  echo "=========================================="
+  echo "Pub/Sub Setup Skipped"
+  echo "=========================================="
+  echo "Use Databricks managed file events instead:"
+  echo "  .option(\"cloudFiles.useManagedFileEvents\", \"true\")"
+  echo ""
+  PUBSUB_TOPIC="N/A (using managed file events)"
+  PUBSUB_SUBSCRIPTION="N/A (using managed file events)"
+  GCS_SA="N/A"
 fi
-
-# Create Pub/Sub subscription for Auto Loader
-echo "Creating Pub/Sub subscription: ${PUBSUB_SUBSCRIPTION}..."
-if gcloud pubsub subscriptions describe ${PUBSUB_SUBSCRIPTION} --project=${PROJECT_ID} 2>/dev/null; then
-    echo "Subscription already exists, skipping creation"
-else
-    gcloud pubsub subscriptions create ${PUBSUB_SUBSCRIPTION} \
-        --topic=${PUBSUB_TOPIC} \
-        --ack-deadline=60 \
-        --message-retention-duration=7d \
-        --project=${PROJECT_ID}
-    echo "[OK] Pub/Sub subscription created"
-fi
-
-# Create GCS notification to Pub/Sub topic
-echo "Creating GCS notification to Pub/Sub..."
-# Check if notification already exists
-EXISTING_NOTIFICATION=$(gsutil notification list gs://${BUCKET_NAME} 2>/dev/null | grep "${PUBSUB_TOPIC}" || echo "")
-if [ -n "${EXISTING_NOTIFICATION}" ]; then
-    echo "Notification already exists, skipping creation"
-else
-    gsutil notification create \
-        -t projects/${PROJECT_ID}/topics/${PUBSUB_TOPIC} \
-        -f json \
-        -e OBJECT_FINALIZE \
-        -p snmp/ \
-        gs://${BUCKET_NAME}
-    echo "[OK] GCS notification created"
-fi
-
-# Get the GCS service account for the project
-echo ""
-echo "Getting GCS service account..."
-GCS_SA=$(gsutil kms serviceaccount -p ${PROJECT_ID})
-echo "GCS Service Account: ${GCS_SA}"
-
-# Grant GCS service account permission to publish to Pub/Sub topic
-echo "Granting GCS service account permission to publish to Pub/Sub..."
-gcloud pubsub topics add-iam-policy-binding ${PUBSUB_TOPIC} \
-    --member="serviceAccount:${GCS_SA}" \
-    --role="roles/pubsub.publisher" \
-    --project=${PROJECT_ID} 2>/dev/null || echo "Policy binding may already exist"
-echo "[OK] Pub/Sub permissions configured"
 
 # Save configuration
 CONFIG_FILE="gcs_config.env"
@@ -161,8 +181,12 @@ echo "GCS Setup Complete!"
 echo "=========================================="
 echo ""
 echo "Bucket URL: gs://${BUCKET_NAME}/snmp/"
-echo "Pub/Sub Topic: projects/${PROJECT_ID}/topics/${PUBSUB_TOPIC}"
-echo "Pub/Sub Subscription: ${PUBSUB_SUBSCRIPTION}"
+if [ "$ENABLE_PUBSUB" = "true" ]; then
+  echo "Pub/Sub Topic: projects/${PROJECT_ID}/topics/${PUBSUB_TOPIC}"
+  echo "Pub/Sub Subscription: ${PUBSUB_SUBSCRIPTION}"
+else
+  echo "Pub/Sub: Disabled (using managed file events)"
+fi
 echo ""
 echo "=========================================="
 echo "Next Steps for Databricks Configuration:"
@@ -172,7 +196,6 @@ echo "1. Run the Databricks notebook: databricks/00_1_setup_gcs_connection.py"
 echo "   This will create:"
 echo "   - Storage credential for GCS"
 echo "   - External location for the bucket"
-echo "   - Enable file events for low-latency ingestion"
 echo ""
 echo "2. Or manually in Databricks SQL:"
 echo ""
@@ -185,7 +208,12 @@ echo "   CREATE EXTERNAL LOCATION telco_snmp_gcs"
 echo "   URL 'gs://${BUCKET_NAME}'"
 echo "   WITH (STORAGE CREDENTIAL telco_gcs_credential);"
 echo ""
-echo "3. Update the SNMP ingestion notebook to use:"
-echo "   - cloudFiles.useManagedFileEvents = true (recommended)"
-echo "   - OR legacy: cloudFiles.useNotifications = true"
+if [ "$ENABLE_PUBSUB" = "true" ]; then
+  echo "3. Update the SNMP ingestion notebook with unmanaged file notifications:"
+  echo "   .option(\"cloudFiles.useNotifications\", \"true\")"
+  echo "   .option(\"cloudFiles.subscriptionPath\", \"projects/${PROJECT_ID}/subscriptions/${PUBSUB_SUBSCRIPTION}\")"
+else
+  echo "3. Update the SNMP ingestion notebook with managed file events (recommended):"
+  echo "   .option(\"cloudFiles.useManagedFileEvents\", \"true\")"
+fi
 echo ""
