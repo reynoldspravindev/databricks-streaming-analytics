@@ -156,6 +156,30 @@ The GCS setup script supports two file notification modes:
    - More control but requires additional setup
    - Run: `ENABLE_PUBSUB=true ./gcp_gcs_setup.sh`
 
+**Automated IAM Permission Setup:**
+
+The `gcp_gcs_setup.sh` script automatically handles IAM permissions for the VM:
+
+- Detects the VM's service account (from `telco-sftp-server`)
+- Grants `Storage Object Admin` role at both project and bucket level
+- Automatically restarts the `telco-generator` service if running to apply new permissions
+- Provides clear status messages if VM is not found or service is not installed yet
+
+**If you see 403 errors:**
+```bash
+# The setup script should have already handled this, but if needed:
+cd infrastructure
+source sftp_config.env
+source gcs_config.env
+
+# Re-run the GCS setup to reapply permissions
+./gcp_gcs_setup.sh
+
+# Or manually restart the generator service:
+gcloud compute ssh ${VM_NAME} --zone=${GCP_ZONE} \
+  --command="sudo systemctl restart telco-generator"
+```
+
 ```
 
 **Understanding the .env Configuration Files**
@@ -425,6 +449,67 @@ gcloud compute ssh ${VM_NAME} --zone=${GCP_ZONE} --command='sudo journalctl -u s
 # Check data generator logs
 gcloud compute ssh ${VM_NAME} --zone=${GCP_ZONE} --command='sudo journalctl -u <flavor>-generator -f'
 ```
+
+### GCS Permission Issues (403 Forbidden)
+
+If you see errors like "Provided scope(s) are not authorized" or "403 Forbidden" when the data generator tries to write to GCS:
+
+**Root Cause:** The VM was created without the correct **OAuth access scopes** for Google Cloud Storage.
+
+GCS access requires TWO things:
+1. **IAM Permissions** - Service account needs Storage Object Admin role
+2. **OAuth Scopes** - VM needs storage API scopes enabled
+
+The error "Provided scope(s) are not authorized" means the VM is missing OAuth scopes.
+
+**Solution:** Use the automated fix script:
+
+```bash
+cd infrastructure
+
+# Run the fix script (will stop/start the VM to update scopes)
+./fix_vm_scopes.sh
+```
+
+The script will:
+1. Check current VM OAuth scopes
+2. Stop the VM temporarily
+3. Update scopes to include cloud-platform (includes storage)
+4. Restart the VM and service
+5. Verify everything is working
+
+**Check logs after the fix:**
+
+```bash
+# View real-time logs (should show successful uploads)
+gcloud compute ssh ${VM_NAME} --zone=${GCP_ZONE} \
+  --command="sudo journalctl -u telco-generator -f"
+
+# You should see:
+# "Uploaded to GCS: gs://bucket/snmp/snmp_xxx.json (75 entries)"
+# instead of 403 errors
+```
+
+**Manual fix (if needed):**
+
+```bash
+cd infrastructure
+source sftp_config.env
+
+# Stop VM, update scopes, and restart
+gcloud compute instances stop ${VM_NAME} --zone=${GCP_ZONE}
+gcloud compute instances set-service-account ${VM_NAME} \
+  --zone=${GCP_ZONE} \
+  --scopes=https://www.googleapis.com/auth/cloud-platform
+gcloud compute instances start ${VM_NAME} --zone=${GCP_ZONE}
+
+# Wait 30 seconds for VM to be ready, then restart service
+sleep 30
+gcloud compute ssh ${VM_NAME} --zone=${GCP_ZONE} \
+  --command="sudo systemctl restart telco-generator"
+```
+
+**Note:** Future VMs created with the updated `gcp_sftp_setup.sh` will have the correct scopes from the start.
 
 ### Databricks Pipeline Issues
 

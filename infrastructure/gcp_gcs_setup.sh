@@ -76,18 +76,63 @@ rm /tmp/lifecycle.json
 echo "[OK] Lifecycle policy set"
 
 # Get the VM's service account
-echo "Getting VM service account..."
+echo ""
+echo "=========================================="
+echo "Configuring VM Permissions"
+echo "=========================================="
+echo "Checking for VM: ${VM_NAME}..."
 VM_SA=$(gcloud compute instances describe ${VM_NAME} --zone=${ZONE} --format='get(serviceAccounts[0].email)' 2>/dev/null || echo "")
 
 if [ -z "${VM_SA}" ]; then
-    echo "Warning: Could not find VM service account. Make sure the VM is created first."
-    echo "You can manually grant access with:"
-    echo "  gsutil iam ch serviceAccount:SERVICE_ACCOUNT@PROJECT.iam.gserviceaccount.com:objectCreator gs://${BUCKET_NAME}"
+    echo "Warning: Could not find VM '${VM_NAME}' in zone '${ZONE}'."
+    echo "Make sure the VM is created first by running:"
+    echo "  cd infrastructure && ./gcp_sftp_setup.sh"
+    echo ""
+    echo "You can manually grant access later with:"
+    echo "  gcloud projects add-iam-policy-binding ${PROJECT_ID} \\"
+    echo "    --member='serviceAccount:SERVICE_ACCOUNT' \\"
+    echo "    --role='roles/storage.objectAdmin'"
 else
-    echo "Granting write access to VM service account: ${VM_SA}..."
-    gsutil iam ch serviceAccount:${VM_SA}:objectCreator gs://${BUCKET_NAME}/
-    gsutil iam ch serviceAccount:${VM_SA}:objectViewer gs://${BUCKET_NAME}/
+    echo "Found VM service account: ${VM_SA}"
+    echo ""
+    
+    # Grant Storage Object Admin role at project level
+    echo "Granting Storage Object Admin role to VM service account..."
+    gcloud projects add-iam-policy-binding ${PROJECT_ID} \
+        --member="serviceAccount:${VM_SA}" \
+        --role="roles/storage.objectAdmin" \
+        --condition=None \
+        2>/dev/null || echo "Note: Policy binding may already exist"
+    
+    # Also grant bucket-level permissions as backup
+    echo "Granting bucket-level permissions..."
+    gsutil iam ch serviceAccount:${VM_SA}:objectAdmin gs://${BUCKET_NAME}/ 2>/dev/null || echo "Note: Bucket policy may already be set"
+    
     echo "[OK] IAM permissions granted"
+    echo ""
+    
+    # Check if telco-generator service is running and restart it
+    echo "Checking if telco-generator service is running on VM..."
+    SERVICE_STATUS=$(gcloud compute ssh ${VM_NAME} --zone=${ZONE} \
+        --command="sudo systemctl is-active telco-generator 2>/dev/null || echo 'inactive'" 2>/dev/null || echo "ssh-failed")
+    
+    if [ "${SERVICE_STATUS}" = "active" ]; then
+        echo "Telco-generator service is running. Restarting to apply new permissions..."
+        gcloud compute ssh ${VM_NAME} --zone=${ZONE} \
+            --command="sudo systemctl restart telco-generator"
+        echo "[OK] Service restarted"
+        
+        # Wait a moment and check status
+        echo "Waiting for service to stabilize..."
+        sleep 3
+        gcloud compute ssh ${VM_NAME} --zone=${ZONE} \
+            --command="sudo systemctl status telco-generator --no-pager -l" || true
+    elif [ "${SERVICE_STATUS}" = "inactive" ]; then
+        echo "Note: telco-generator service is not running. Start it with:"
+        echo "  gcloud compute ssh ${VM_NAME} --zone=${ZONE} --command='sudo systemctl start telco-generator'"
+    else
+        echo "Note: Could not check service status. Service may not be installed yet."
+    fi
 fi
 
 if [ "$ENABLE_PUBSUB" = "true" ]; then
@@ -155,8 +200,8 @@ else
   echo "Use Databricks managed file events instead:"
   echo "  .option(\"cloudFiles.useManagedFileEvents\", \"true\")"
   echo ""
-  PUBSUB_TOPIC="N/A (using managed file events)"
-  PUBSUB_SUBSCRIPTION="N/A (using managed file events)"
+  PUBSUB_TOPIC="N/A"
+  PUBSUB_SUBSCRIPTION="N/A"
   GCS_SA="N/A"
 fi
 

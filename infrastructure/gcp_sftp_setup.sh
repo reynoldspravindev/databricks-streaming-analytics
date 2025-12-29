@@ -102,6 +102,7 @@ if ! gcloud compute instances describe $VM_NAME --zone=$ZONE --project=$PROJECT_
         --image-project=ubuntu-os-cloud \
         --metadata=enable-oslogin=FALSE \
         --tags=sftp-server \
+        --scopes=https://www.googleapis.com/auth/cloud-platform \
         --project=$PROJECT_ID
     
     echo "Waiting for VM to be ready (60 seconds)..."
