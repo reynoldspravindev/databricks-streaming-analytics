@@ -9,7 +9,7 @@ This demo supports multiple industry use cases. Choose the one that best fits yo
 | Flavor | Description | Data Generator | Notebooks |
 |--------|-------------|----------------|-----------|
 | **Telco Network Performance** | Monitor network devices, latency, packet loss, throughput | `telco_data_generator.py` | `databricks/*.py/sql` |
-| **Retail Store Performance** | Track store events, sales metrics, inventory, customer flow | `retail_data_generator.py` | `databricks/retail/*.py/sql` |
+| **Retail Store Performance** | Track store metrics for fast food chains (with drive-through) and apparel retail | `retail_data_generator.py` | `databricks/retail/*.py/sql` |
 
 ## Demo Objectives
 
@@ -239,6 +239,7 @@ gcloud compute scp ../scripts/telco_data_generator.py ${VM_NAME}:~/ --zone=${GCP
 gcloud compute ssh ${VM_NAME} --zone=${GCP_ZONE} --command="sudo mv ~/telco_data_generator.py /opt/telco-generator/ && sudo chmod 755 /opt/telco-generator/telco_data_generator.py"
 
 # For Retail (alternative):
+# Supports both fast food chains and apparel retail with configurable mix
 gcloud compute scp ../scripts/retail_data_generator.py ${VM_NAME}:~/ --zone=${GCP_ZONE}
 gcloud compute ssh ${VM_NAME} --zone=${GCP_ZONE} --command="sudo mv ~/retail_data_generator.py /opt/retail-generator/ && sudo chmod 755 /opt/retail-generator/retail_data_generator.py"
 
@@ -256,19 +257,41 @@ gcloud compute ssh ${VM_NAME} --zone=${GCP_ZONE} --command="sudo systemctl statu
 
 # Check the logs to ensure data is being generated
 gcloud compute ssh ${VM_NAME} --zone=${GCP_ZONE} --command="sudo journalctl -u telco-generator -f"
+```
 
-# Note: For Retail flavor, use retail-generator.service and update the GCS_RETAIL_BUCKET variable
-# The retail service expects /sftp/retail/events directory and metrics in GCS
+**For Retail Generator (Alternative):**
 
+```bash
+# Configure and install retail systemd service
+# The GCS_RETAIL_BUCKET uses the metrics path (different from SNMP)
+export GCS_RETAIL_BUCKET="${GCS_SNMP_PATH%snmp/}metrics/"
+
+# Update the service file with your GCS bucket path
+sed "s|gs://gcp-sandbox-field-eng-telco-snmp/metrics/|${GCS_RETAIL_BUCKET}|g" retail-generator.service > retail-generator.service.tmp
+mv retail-generator.service.tmp retail-generator.service
+
+# Copy and install the configured service
+gcloud compute scp retail-generator.service ${VM_NAME}:~/ --zone=${GCP_ZONE}
+gcloud compute ssh ${VM_NAME} --zone=${GCP_ZONE} --command="sudo mv ~/retail-generator.service /etc/systemd/system/ && sudo systemctl daemon-reload && sudo systemctl enable retail-generator && sudo systemctl start retail-generator"
+
+# Verify the service is running
+gcloud compute ssh ${VM_NAME} --zone=${GCP_ZONE} --command="sudo systemctl status retail-generator"
+
+# Check the logs to ensure data is being generated
+gcloud compute ssh ${VM_NAME} --zone=${GCP_ZONE} --command="sudo journalctl -u retail-generator -f"
 ```
 
 **Important Notes:**
-- The systemd service file contains a placeholder `<YOUR_GCS_BUCKET_NAME>` that must be replaced with your actual bucket name
+- **Telco generator**: The systemd service file contains a placeholder `<YOUR_GCS_BUCKET_NAME>` that must be replaced with your actual bucket name
+- **Retail generator**: The service file contains a placeholder bucket path that must be replaced with your actual GCS metrics path
 - The bucket name is available in `gcs_config.env` after running `gcp_gcs_setup.sh`
-- The data generator will write:
+- **Telco data generator writes:**
   - **Syslog data** → Local SFTP directory (`/sftp/telco/syslog`)
-  - **SNMP metrics** → GCS bucket (JSON format for Auto Loader)
-- The service runs as the `telco_user` with automatic restart on failure
+  - **SNMP metrics** → GCS bucket at `/snmp/` path (JSON format for Auto Loader)
+- **Retail data generator writes:**
+  - **Events data** → Local SFTP directory (`/sftp/retail/events`)
+  - **Metrics data** → GCS bucket at `/metrics/` path (JSON format for Auto Loader)
+- Both services run as the `telco_user` with automatic restart on failure
 
 
 ### Step 3: Set Up Databricks
@@ -382,9 +405,10 @@ df = (spark.readStream
 - Geographic performance analysis
 
 **Retail KPIs:**
-- Sales metrics, inventory levels, customer flow
-- Store performance scoring
-- Regional analytics
+- **Apparel**: Sales metrics, inventory levels, customer flow, return rates, fitting room usage
+- **Fast Food**: Drive-through performance, order accuracy, kitchen efficiency, food waste
+- Category-aware store health scoring
+- Regional analytics across both categories
 
 ## Industry-Specific Metrics
 
@@ -400,13 +424,30 @@ df = (spark.readStream
 
 ### Retail Store Performance KPIs
 
+The retail generator supports two categories with category-specific metrics:
+
+#### Apparel Retail
+
 | Metric | Description | Thresholds |
 |--------|-------------|------------|
-| **Sales/Hour** | Transactions per hour | Low: <50, Normal: 50-200, High: >200 |
-| **Conversion Rate** (%) | Visitors to buyers | Poor: <5%, Average: 5-15%, Good: >15% |
-| **Inventory Turnover** | Stock movement rate | Slow: <2, Normal: 2-6, Fast: >6 |
-| **Customer Wait Time** (min) | Average checkout time | Good: <3, Fair: 3-7, Poor: >7 |
-| **Store Uptime** (%) | POS system availability | Critical: <99%, Warning: 99-99.9%, Good: >99.9% |
+| **Hourly Sales** | Revenue per hour | Normal: $500-25k, Anomaly: >$22k |
+| **Conversion Rate** (%) | Visitors to buyers | Low: <5%, Normal: 5-45%, Anomaly: >40% |
+| **Checkout Wait Time** (sec) | Average checkout time | Good: <120, Fair: 120-300, Poor: >300 |
+| **Return Rate** (%) | Returns percentage | Normal: 0-15%, Anomaly: >12% |
+| **Fitting Room Usage** (%) | Fitting room utilization | Normal: 10-85%, High: >80% |
+| **Online Pickup Rate** (%) | BOPIS/Curbside pickup | Normal: 5-40%, High: >35% |
+
+#### Fast Food Chains
+
+| Metric | Description | Thresholds |
+|--------|-------------|------------|
+| **Drive-Through Wait Time** (sec) | Order to pickup time | Good: <200, Fair: 200-420, Poor: >420 |
+| **Drive-Through Throughput** (cars/hr) | Cars served per hour | Low: <15, Normal: 15-120, High: >110 |
+| **Order Accuracy** (%) | Correct orders percentage | Critical: <88%, Fair: 88-95%, Good: >95% |
+| **Speaker to Window Time** (sec) | Speaker to pickup window | Good: <180, Fair: 180-270, Poor: >270 |
+| **Kitchen Ticket Time** (sec) | Food prep time | Good: <300, Fair: 300-540, Poor: >540 |
+| **Food Waste** (%) | Waste percentage | Good: <10%, Fair: 10-20%, High: >20% |
+| **Mobile Order Pickup** (sec) | Mobile order fulfillment | Good: <120, Fair: 120-220, Poor: >220 |
 
 ## Documentation
 
@@ -435,7 +476,106 @@ sudo systemctl restart <flavor>-generator
 sudo systemctl status <flavor>-generator
 ```
 
+#### Retail Generator Store Mix Configuration
+
+The retail data generator supports configurable ratios of fast food vs apparel stores:
+
+```bash
+# Edit the retail-generator.service file
+sudo nano /etc/systemd/system/retail-generator.service
+
+# Add or modify the --fast-food-ratio parameter in ExecStart:
+# ExecStart=/usr/bin/python3 /opt/retail-generator/retail_data_generator.py \
+#   --events-dir /sftp/retail/events \
+#   --metrics-gcs-bucket gs://your-bucket/metrics/ \
+#   --files-per-minute 1000 \
+#   --fast-food-ratio 0.5
+
+# Restart to apply changes
+sudo systemctl daemon-reload
+sudo systemctl restart retail-generator
+```
+
+**Store Mix Examples:**
+- `--fast-food-ratio 0.5` - 50% fast food, 50% apparel (default)
+- `--fast-food-ratio 0.7` - 70% fast food, 30% apparel
+- `--fast-food-ratio 1.0` - 100% fast food (drive-through focus)
+- `--fast-food-ratio 0.0` - 100% apparel retail
+
+**Store Categories Generated:**
+- **Fast Food**: BurgerKing, TimHortons, QuickBite, DriveThruExpress
+  - Store Types: drive_through, dine_in, express_counter, food_court, flagship_restaurant
+- **Apparel**: Lululemon, Arcteryx, AthleticWear, OutdoorGear
+  - Store Types: flagship, mall, outlet, express
+
 ## Troubleshooting
+
+### SSH Access Issues
+
+If you cannot SSH into the VM from the Google Cloud Console (browser SSH keeps spinning), this is typically caused by missing firewall rules.
+
+**Quick Fix for Demo (Temporary):**
+
+For demo purposes, you can allow SSH from all IP addresses:
+
+```bash
+gcloud compute firewall-rules create allow-ssh-from-anywhere \
+  --direction=INGRESS \
+  --action=allow \
+  --rules=tcp:22 \
+  --source-ranges=0.0.0.0/0
+```
+
+**SECURITY WARNING:** This configuration opens SSH access from any IP address on the internet. This is acceptable for temporary demos but should NEVER be used in production environments.
+
+**Production-Ready SSH Access (Recommended):**
+
+For production or long-term deployments, restrict SSH access to specific sources:
+
+**Option 1: Identity-Aware Proxy (IAP) for Cloud Console SSH**
+```bash
+# Allow SSH only from Google Cloud Console via IAP
+gcloud compute firewall-rules create allow-ssh-from-iap \
+  --direction=INGRESS \
+  --action=allow \
+  --rules=tcp:22 \
+  --source-ranges=35.235.240.0/20 \
+  --description="Allow SSH from Cloud Console via Identity-Aware Proxy"
+```
+
+**Option 2: Your Specific IP Address**
+```bash
+# Get your current IP
+MY_IP=$(curl -s ifconfig.me)
+
+# Allow SSH only from your IP
+gcloud compute firewall-rules create allow-ssh-from-my-ip \
+  --direction=INGRESS \
+  --action=allow \
+  --rules=tcp:22 \
+  --source-ranges=${MY_IP}/32
+```
+
+**Option 3: Combine Both (Best Practice)**
+```bash
+# Allow both IAP (Cloud Console) and your specific IP
+gcloud compute firewall-rules create allow-ssh-secure \
+  --direction=INGRESS \
+  --action=allow \
+  --rules=tcp:22 \
+  --source-ranges=35.235.240.0/20,<YOUR_IP>/32
+```
+
+**Verify Current Firewall Rules:**
+```bash
+gcloud compute firewall-rules list --filter="allowed.ports:22" \
+  --format="table(name,sourceRanges.list(),allowed.ports)"
+```
+
+**Important:** After your demo is complete, remove the open firewall rule:
+```bash
+gcloud compute firewall-rules delete allow-ssh-from-anywhere
+```
 
 ### SFTP Connection Issues
 

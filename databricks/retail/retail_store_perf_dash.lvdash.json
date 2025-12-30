@@ -1,4 +1,160 @@
 {
+  "datasets": [
+    {
+      "name": "ds_store_count",
+      "displayName": "Total Store Count",
+      "queryLines": [
+        "SELECT COUNT(DISTINCT store_id) as total_stores FROM retail_analytics.gold.gold_store_health"
+      ]
+    },
+    {
+      "name": "ds_critical_count",
+      "displayName": "Critical Store Count",
+      "queryLines": [
+        "SELECT COUNT(*) as critical_stores FROM retail_analytics.gold.gold_store_health WHERE health_status IN ('Critical', 'Poor') OR requires_attention = true"
+      ]
+    },
+    {
+      "name": "ds_avg_health",
+      "displayName": "Average Health Score",
+      "queryLines": [
+        "SELECT ROUND(AVG(health_score), 1) as avg_health_score FROM retail_analytics.gold.gold_store_health"
+      ]
+    },
+    {
+      "name": "ds_total_sales",
+      "displayName": "Total Sales",
+      "queryLines": [
+        "SELECT ROUND(SUM(avg_value), 0) as total_sales FROM retail_analytics.gold.gold_store_performance_5min WHERE metric_name = 'hourly_sales' AND window_start >= current_timestamp() - INTERVAL 24 HOURS"
+      ]
+    },
+    {
+      "name": "ds_health_distribution",
+      "displayName": "Health Status Distribution",
+      "queryLines": [
+        "SELECT health_status, COUNT(*) as count FROM retail_analytics.gold.gold_store_health GROUP BY health_status ORDER BY count DESC"
+      ]
+    },
+    {
+      "name": "ds_store_types",
+      "displayName": "Store Type Count",
+      "queryLines": [
+        "SELECT store_type, COUNT(*) as count FROM retail_analytics.gold.gold_store_health GROUP BY store_type ORDER BY count DESC"
+      ]
+    },
+    {
+      "name": "ds_category_breakdown",
+      "displayName": "Store Category Breakdown",
+      "queryLines": [
+        "SELECT store_category, COUNT(*) as count, ROUND(AVG(health_score), 1) as avg_health FROM retail_analytics.gold.gold_store_health GROUP BY store_category ORDER BY count DESC"
+      ]
+    },
+    {
+      "name": "ds_region_summary",
+      "displayName": "Region Summary",
+      "queryLines": [
+        "SELECT region, COUNT(*) as stores, COUNT(CASE WHEN store_category = 'apparel' THEN 1 END) as apparel_stores, COUNT(CASE WHEN store_category = 'fast_food' THEN 1 END) as fast_food_stores, ROUND(AVG(health_score), 1) as avg_health, ROUND(AVG(current_hourly_sales), 2) as avg_sales, SUM(critical_event_count_1h) as critical_events FROM retail_analytics.gold.gold_store_health GROUP BY region ORDER BY avg_health ASC"
+      ]
+    },
+    {
+      "name": "ds_attention_stores",
+      "displayName": "Stores Needing Attention",
+      "queryLines": [
+        "SELECT store_id, store_type, region, health_status, health_score, current_wait_time_sec as wait_time_sec, current_return_rate_pct as return_rate_pct FROM retail_analytics.gold.gold_store_health WHERE requires_attention = true OR health_status IN ('Critical', 'Poor') ORDER BY health_score ASC LIMIT 50"
+      ]
+    },
+    {
+      "name": "ds_type_health",
+      "displayName": "Store Type by Health",
+      "queryLines": [
+        "SELECT store_type, health_status, COUNT(*) as count FROM retail_analytics.gold.gold_store_health GROUP BY store_type, health_status ORDER BY store_type, health_status"
+      ]
+    },
+    {
+      "name": "ds_sales_trend",
+      "displayName": "Sales Trend",
+      "queryLines": [
+        "SELECT window_start, region, ROUND(AVG(avg_value), 2) as avg_sales FROM retail_analytics.gold.gold_store_performance_5min WHERE metric_name = 'hourly_sales' AND window_start >= current_timestamp() - INTERVAL 6 HOURS GROUP BY window_start, region ORDER BY window_start"
+      ]
+    },
+    {
+      "name": "ds_wait_time_trend",
+      "displayName": "Wait Time Trend",
+      "queryLines": [
+        "SELECT window_start, store_type, ROUND(AVG(avg_value), 1) as avg_wait_time FROM retail_analytics.gold.gold_store_performance_5min WHERE metric_name = 'checkout_wait_time_sec' AND window_start >= current_timestamp() - INTERVAL 6 HOURS GROUP BY window_start, store_type ORDER BY window_start"
+      ]
+    },
+    {
+      "name": "ds_conversion_trend",
+      "displayName": "Conversion Trend",
+      "queryLines": [
+        "SELECT window_start, region, ROUND(AVG(avg_value), 2) as avg_conversion FROM retail_analytics.gold.gold_store_performance_5min WHERE metric_name = 'conversion_rate_pct' AND window_start >= current_timestamp() - INTERVAL 6 HOURS GROUP BY window_start, region ORDER BY window_start"
+      ]
+    },
+    {
+      "name": "ds_critical_events",
+      "displayName": "Critical Events",
+      "queryLines": [
+        "SELECT event_timestamp, store_id, region, event_category, severity_name, event_message FROM retail_analytics.gold.gold_store_events WHERE is_critical = true AND event_timestamp >= current_timestamp() - INTERVAL 24 HOURS ORDER BY event_timestamp DESC LIMIT 100"
+      ]
+    },
+    {
+      "name": "ds_category_dist",
+      "displayName": "Category Distribution",
+      "queryLines": [
+        "SELECT event_category, COUNT(*) as count FROM retail_analytics.gold.gold_store_events WHERE event_timestamp >= current_timestamp() - INTERVAL 24 HOURS GROUP BY event_category ORDER BY count DESC"
+      ]
+    },
+    {
+      "name": "ds_severity_dist",
+      "displayName": "Severity Distribution",
+      "queryLines": [
+        "SELECT severity_name, COUNT(*) as count FROM retail_analytics.gold.gold_store_events WHERE event_timestamp >= current_timestamp() - INTERVAL 24 HOURS GROUP BY severity_name ORDER BY count DESC"
+      ]
+    },
+    {
+      "name": "ds_dt_avg_wait",
+      "displayName": "Drive-Through Avg Wait Time",
+      "queryLines": [
+        "SELECT ROUND(AVG(avg_wait_time_sec), 1) as avg_wait FROM retail_analytics.gold.gold_drive_through_performance WHERE window_start >= current_timestamp() - INTERVAL 6 HOURS"
+      ]
+    },
+    {
+      "name": "ds_dt_accuracy",
+      "displayName": "Drive-Through Avg Accuracy",
+      "queryLines": [
+        "SELECT ROUND(AVG(avg_order_accuracy_pct), 1) as avg_accuracy FROM retail_analytics.gold.gold_drive_through_performance WHERE window_start >= current_timestamp() - INTERVAL 6 HOURS"
+      ]
+    },
+    {
+      "name": "ds_dt_throughput",
+      "displayName": "Drive-Through Avg Throughput",
+      "queryLines": [
+        "SELECT ROUND(AVG(avg_throughput_per_hour), 1) as avg_throughput FROM retail_analytics.gold.gold_drive_through_performance WHERE window_start >= current_timestamp() - INTERVAL 6 HOURS"
+      ]
+    },
+    {
+      "name": "ds_dt_performance_grade",
+      "displayName": "Drive-Through Performance Grades",
+      "queryLines": [
+        "SELECT performance_grade, COUNT(DISTINCT store_id) as count FROM retail_analytics.gold.gold_drive_through_performance WHERE window_start >= current_timestamp() - INTERVAL 6 HOURS GROUP BY performance_grade ORDER BY CASE performance_grade WHEN 'Excellent' THEN 1 WHEN 'Good' THEN 2 WHEN 'Fair' THEN 3 ELSE 4 END"
+      ]
+    },
+    {
+      "name": "ds_dt_region_perf",
+      "displayName": "Drive-Through Performance by Region",
+      "queryLines": [
+        "SELECT region, ROUND(AVG(avg_wait_time_sec), 1) as avg_wait, ROUND(AVG(avg_order_accuracy_pct), 1) as avg_accuracy FROM retail_analytics.gold.gold_drive_through_performance WHERE window_start >= current_timestamp() - INTERVAL 6 HOURS GROUP BY region ORDER BY avg_wait DESC"
+      ]
+    },
+    {
+      "name": "ds_dt_worst_stores",
+      "displayName": "Worst Performing Drive-Through Stores",
+      "queryLines": [
+        "SELECT store_id, region, ROUND(AVG(avg_wait_time_sec), 1) as avg_wait, ROUND(AVG(avg_order_accuracy_pct), 1) as avg_accuracy, MAX(performance_grade) as performance_grade FROM retail_analytics.gold.gold_drive_through_performance WHERE window_start >= current_timestamp() - INTERVAL 6 HOURS GROUP BY store_id, region HAVING MAX(performance_grade) IN ('Needs_Improvement', 'Fair') ORDER BY avg_wait DESC LIMIT 20"
+      ]
+    }
+  ],
   "pages": [
     {
       "name": "executive_overview",
@@ -12,23 +168,38 @@
                 "name": "main_query",
                 "query": {
                   "datasetName": "ds_store_count",
-                  "disaggregated": false,
                   "fields": [
-                    {"name": "total_stores", "expression": "total_stores"}
-                  ]
+                    {
+                      "name": "total_stores",
+                      "expression": "`total_stores`"
+                    }
+                  ],
+                  "disaggregated": true
                 }
               }
             ],
             "spec": {
-              "version": 3,
+              "version": 2,
               "widgetType": "counter",
               "encodings": {
-                "value": {"fieldName": "total_stores", "displayName": "Total Stores"}
+                "value": {
+                  "fieldName": "total_stores",
+                  "displayName": "Total Stores"
+                }
               },
-              "frame": {"title": "Total Stores", "showTitle": true, "showDescription": false}
+              "frame": {
+                "title": "Total Stores",
+                "showTitle": true,
+                "showDescription": false
+              }
             }
           },
-          "position": {"x": 0, "y": 0, "width": 2, "height": 2}
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 2,
+            "height": 2
+          }
         },
         {
           "widget": {
@@ -38,23 +209,38 @@
                 "name": "main_query",
                 "query": {
                   "datasetName": "ds_critical_count",
-                  "disaggregated": false,
                   "fields": [
-                    {"name": "critical_stores", "expression": "critical_stores"}
-                  ]
+                    {
+                      "name": "critical_stores",
+                      "expression": "`critical_stores`"
+                    }
+                  ],
+                  "disaggregated": true
                 }
               }
             ],
             "spec": {
-              "version": 3,
+              "version": 2,
               "widgetType": "counter",
               "encodings": {
-                "value": {"fieldName": "critical_stores", "displayName": "Critical Stores"}
+                "value": {
+                  "fieldName": "critical_stores",
+                  "displayName": "Critical Stores"
+                }
               },
-              "frame": {"title": "Stores Needing Attention", "showTitle": true, "showDescription": false}
+              "frame": {
+                "title": "Stores Needing Attention",
+                "showTitle": true,
+                "showDescription": false
+              }
             }
           },
-          "position": {"x": 2, "y": 0, "width": 2, "height": 2}
+          "position": {
+            "x": 2,
+            "y": 0,
+            "width": 2,
+            "height": 2
+          }
         },
         {
           "widget": {
@@ -64,23 +250,37 @@
                 "name": "main_query",
                 "query": {
                   "datasetName": "ds_avg_health",
-                  "disaggregated": false,
                   "fields": [
-                    {"name": "avg_health_score", "expression": "avg_health_score"}
-                  ]
+                    {
+                      "name": "avg_health_score",
+                      "expression": "`avg_health_score`"
+                    }
+                  ],
+                  "disaggregated": true
                 }
               }
             ],
             "spec": {
-              "version": 3,
+              "version": 2,
               "widgetType": "counter",
               "encodings": {
-                "value": {"fieldName": "avg_health_score", "displayName": "Health Score"}
+                "value": {
+                  "fieldName": "avg_health_score"
+                }
               },
-              "frame": {"title": "Store Health Score", "showTitle": true, "showDescription": false}
+              "frame": {
+                "title": "Store Health Score",
+                "showTitle": true,
+                "showDescription": false
+              }
             }
           },
-          "position": {"x": 4, "y": 0, "width": 2, "height": 2}
+          "position": {
+            "x": 4,
+            "y": 0,
+            "width": 2,
+            "height": 2
+          }
         },
         {
           "widget": {
@@ -90,23 +290,38 @@
                 "name": "main_query",
                 "query": {
                   "datasetName": "ds_total_sales",
-                  "disaggregated": false,
                   "fields": [
-                    {"name": "total_sales", "expression": "total_sales"}
-                  ]
+                    {
+                      "name": "total_sales",
+                      "expression": "`total_sales`"
+                    }
+                  ],
+                  "disaggregated": true
                 }
               }
             ],
             "spec": {
-              "version": 3,
+              "version": 2,
               "widgetType": "counter",
               "encodings": {
-                "value": {"fieldName": "total_sales", "displayName": "Total Sales"}
+                "value": {
+                  "fieldName": "total_sales",
+                  "displayName": "Total Sales"
+                }
               },
-              "frame": {"title": "Total Sales ($)", "showTitle": true, "showDescription": false}
+              "frame": {
+                "title": "Total Sales ($)",
+                "showTitle": true,
+                "showDescription": false
+              }
             }
           },
-          "position": {"x": 6, "y": 0, "width": 2, "height": 2}
+          "position": {
+            "x": 0,
+            "y": 2,
+            "width": 6,
+            "height": 2
+          }
         },
         {
           "widget": {
@@ -116,11 +331,17 @@
                 "name": "main_query",
                 "query": {
                   "datasetName": "ds_health_distribution",
-                  "disaggregated": true,
                   "fields": [
-                    {"name": "health_status", "expression": "health_status"},
-                    {"name": "count", "expression": "count"}
-                  ]
+                    {
+                      "name": "countdistinct(count)",
+                      "expression": "COUNT(DISTINCT `count`)"
+                    },
+                    {
+                      "name": "health_status",
+                      "expression": "`health_status`"
+                    }
+                  ],
+                  "disaggregated": false
                 }
               }
             ],
@@ -128,13 +349,34 @@
               "version": 3,
               "widgetType": "pie",
               "encodings": {
-                "angle": {"fieldName": "count", "displayName": "Count"},
-                "color": {"fieldName": "health_status", "displayName": "Health Status"}
+                "angle": {
+                  "fieldName": "countdistinct(count)",
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "displayName": "Count of Stores"
+                },
+                "color": {
+                  "fieldName": "health_status",
+                  "displayName": "Health Status",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
               },
-              "frame": {"title": "Store Health Distribution", "showTitle": true, "showDescription": false}
+              "frame": {
+                "title": "Store Health Distribution",
+                "showTitle": true,
+                "showDescription": false
+              }
             }
           },
-          "position": {"x": 0, "y": 2, "width": 3, "height": 4}
+          "position": {
+            "x": 0,
+            "y": 4,
+            "width": 3,
+            "height": 4
+          }
         },
         {
           "widget": {
@@ -144,11 +386,17 @@
                 "name": "main_query",
                 "query": {
                   "datasetName": "ds_store_types",
-                  "disaggregated": true,
                   "fields": [
-                    {"name": "store_type", "expression": "store_type"},
-                    {"name": "count", "expression": "count"}
-                  ]
+                    {
+                      "name": "store_type",
+                      "expression": "`store_type`"
+                    },
+                    {
+                      "name": "sum(count)",
+                      "expression": "SUM(`count`)"
+                    }
+                  ],
+                  "disaggregated": false
                 }
               }
             ],
@@ -156,13 +404,38 @@
               "version": 3,
               "widgetType": "bar",
               "encodings": {
-                "x": {"fieldName": "store_type", "displayName": "Store Type"},
-                "y": {"fieldName": "count", "displayName": "Count"}
+                "x": {
+                  "fieldName": "store_type",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "sum(count)",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "store_type",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
               },
-              "frame": {"title": "Stores by Type", "showTitle": true, "showDescription": false}
+              "frame": {
+                "title": "Stores by Type",
+                "showTitle": true,
+                "showDescription": false
+              }
             }
           },
-          "position": {"x": 3, "y": 2, "width": 3, "height": 4}
+          "position": {
+            "x": 3,
+            "y": 4,
+            "width": 3,
+            "height": 4
+          }
         },
         {
           "widget": {
@@ -172,111 +445,236 @@
                 "name": "main_query",
                 "query": {
                   "datasetName": "ds_region_summary",
-                  "disaggregated": true,
                   "fields": [
-                    {"name": "region", "expression": "region"},
-                    {"name": "stores", "expression": "stores"},
-                    {"name": "avg_health", "expression": "avg_health"},
-                    {"name": "avg_sales", "expression": "avg_sales"},
-                    {"name": "critical_events", "expression": "critical_events"}
-                  ]
+                    {
+                      "name": "region",
+                      "expression": "`region`"
+                    },
+                    {
+                      "name": "stores",
+                      "expression": "`stores`"
+                    },
+                    {
+                      "name": "apparel_stores",
+                      "expression": "`apparel_stores`"
+                    },
+                    {
+                      "name": "fast_food_stores",
+                      "expression": "`fast_food_stores`"
+                    },
+                    {
+                      "name": "avg_health",
+                      "expression": "`avg_health`"
+                    },
+                    {
+                      "name": "avg_sales",
+                      "expression": "`avg_sales`"
+                    },
+                    {
+                      "name": "critical_events",
+                      "expression": "`critical_events`"
+                    }
+                  ],
+                  "disaggregated": true
                 }
               }
             ],
             "spec": {
-              "version": 3,
+              "version": 1,
               "widgetType": "table",
               "encodings": {
                 "columns": [
-                  {"fieldName": "region", "displayName": "Region"},
-                  {"fieldName": "stores", "displayName": "Stores"},
-                  {"fieldName": "avg_health", "displayName": "Avg Health"},
-                  {"fieldName": "avg_sales", "displayName": "Avg Sales ($)"},
-                  {"fieldName": "critical_events", "displayName": "Critical Events"}
+                  {
+                    "fieldName": "region",
+                    "booleanValues": ["false", "true"],
+                    "imageUrlTemplate": "{{ @ }}",
+                    "imageTitleTemplate": "{{ @ }}",
+                    "imageWidth": "",
+                    "imageHeight": "",
+                    "linkUrlTemplate": "{{ @ }}",
+                    "linkTextTemplate": "{{ @ }}",
+                    "linkTitleTemplate": "{{ @ }}",
+                    "linkOpenInNewTab": true,
+                    "type": "string",
+                    "displayAs": "string",
+                    "visible": true,
+                    "order": 100000,
+                    "title": "Region",
+                    "allowSearch": false,
+                    "alignContent": "left",
+                    "allowHTML": false,
+                    "highlightLinks": false,
+                    "useMonospaceFont": false,
+                    "preserveWhitespace": false
+                  },
+                  {
+                    "fieldName": "stores",
+                    "numberFormat": "0",
+                    "booleanValues": ["false", "true"],
+                    "imageUrlTemplate": "{{ @ }}",
+                    "imageTitleTemplate": "{{ @ }}",
+                    "imageWidth": "",
+                    "imageHeight": "",
+                    "linkUrlTemplate": "{{ @ }}",
+                    "linkTextTemplate": "{{ @ }}",
+                    "linkTitleTemplate": "{{ @ }}",
+                    "linkOpenInNewTab": true,
+                    "type": "integer",
+                    "displayAs": "number",
+                    "visible": true,
+                    "order": 100001,
+                    "title": "No. of Stores",
+                    "allowSearch": false,
+                    "alignContent": "right",
+                    "allowHTML": false,
+                    "highlightLinks": false,
+                    "useMonospaceFont": false,
+                    "preserveWhitespace": false
+                  },
+                  {
+                    "fieldName": "apparel_stores",
+                    "numberFormat": "0",
+                    "booleanValues": ["false", "true"],
+                    "imageUrlTemplate": "{{ @ }}",
+                    "imageTitleTemplate": "{{ @ }}",
+                    "imageWidth": "",
+                    "imageHeight": "",
+                    "linkUrlTemplate": "{{ @ }}",
+                    "linkTextTemplate": "{{ @ }}",
+                    "linkTitleTemplate": "{{ @ }}",
+                    "linkOpenInNewTab": true,
+                    "type": "integer",
+                    "displayAs": "number",
+                    "visible": true,
+                    "order": 100002,
+                    "title": "Apparel",
+                    "allowSearch": false,
+                    "alignContent": "right",
+                    "allowHTML": false,
+                    "highlightLinks": false,
+                    "useMonospaceFont": false,
+                    "preserveWhitespace": false
+                  },
+                  {
+                    "fieldName": "fast_food_stores",
+                    "numberFormat": "0",
+                    "booleanValues": ["false", "true"],
+                    "imageUrlTemplate": "{{ @ }}",
+                    "imageTitleTemplate": "{{ @ }}",
+                    "imageWidth": "",
+                    "imageHeight": "",
+                    "linkUrlTemplate": "{{ @ }}",
+                    "linkTextTemplate": "{{ @ }}",
+                    "linkTitleTemplate": "{{ @ }}",
+                    "linkOpenInNewTab": true,
+                    "type": "integer",
+                    "displayAs": "number",
+                    "visible": true,
+                    "order": 100003,
+                    "title": "Fast Food",
+                    "allowSearch": false,
+                    "alignContent": "right",
+                    "allowHTML": false,
+                    "highlightLinks": false,
+                    "useMonospaceFont": false,
+                    "preserveWhitespace": false
+                  },
+                  {
+                    "fieldName": "avg_health",
+                    "numberFormat": "0.00",
+                    "booleanValues": ["false", "true"],
+                    "imageUrlTemplate": "{{ @ }}",
+                    "imageTitleTemplate": "{{ @ }}",
+                    "imageWidth": "",
+                    "imageHeight": "",
+                    "linkUrlTemplate": "{{ @ }}",
+                    "linkTextTemplate": "{{ @ }}",
+                    "linkTitleTemplate": "{{ @ }}",
+                    "linkOpenInNewTab": true,
+                    "type": "float",
+                    "displayAs": "number",
+                    "visible": true,
+                    "order": 100004,
+                    "title": "Average Health",
+                    "allowSearch": false,
+                    "alignContent": "right",
+                    "allowHTML": false,
+                    "highlightLinks": false,
+                    "useMonospaceFont": false,
+                    "preserveWhitespace": false
+                  },
+                  {
+                    "fieldName": "avg_sales",
+                    "numberFormat": "0.00",
+                    "booleanValues": ["false", "true"],
+                    "imageUrlTemplate": "{{ @ }}",
+                    "imageTitleTemplate": "{{ @ }}",
+                    "imageWidth": "",
+                    "imageHeight": "",
+                    "linkUrlTemplate": "{{ @ }}",
+                    "linkTextTemplate": "{{ @ }}",
+                    "linkTitleTemplate": "{{ @ }}",
+                    "linkOpenInNewTab": true,
+                    "type": "float",
+                    "displayAs": "number",
+                    "visible": true,
+                    "order": 100005,
+                    "title": "Average Sales",
+                    "allowSearch": false,
+                    "alignContent": "right",
+                    "allowHTML": false,
+                    "highlightLinks": false,
+                    "useMonospaceFont": false,
+                    "preserveWhitespace": false
+                  },
+                  {
+                    "fieldName": "critical_events",
+                    "numberFormat": "0",
+                    "booleanValues": ["false", "true"],
+                    "imageUrlTemplate": "{{ @ }}",
+                    "imageTitleTemplate": "{{ @ }}",
+                    "imageWidth": "",
+                    "imageHeight": "",
+                    "linkUrlTemplate": "{{ @ }}",
+                    "linkTextTemplate": "{{ @ }}",
+                    "linkTitleTemplate": "{{ @ }}",
+                    "linkOpenInNewTab": true,
+                    "type": "integer",
+                    "displayAs": "number",
+                    "visible": true,
+                    "order": 100006,
+                    "title": "Critical Events",
+                    "allowSearch": false,
+                    "alignContent": "right",
+                    "allowHTML": false,
+                    "highlightLinks": false,
+                    "useMonospaceFont": false,
+                    "preserveWhitespace": false
+                  }
                 ]
               },
-              "frame": {"title": "Performance by Region", "showTitle": true, "showDescription": false}
-            }
-          },
-          "position": {"x": 0, "y": 6, "width": 6, "height": 4}
-        }
-      ]
-    },
-    {
-      "name": "store_health_page",
-      "displayName": "Store Health",
-      "layout": [
-        {
-          "widget": {
-            "name": "attention_table",
-            "queries": [
-              {
-                "name": "main_query",
-                "query": {
-                  "datasetName": "ds_attention_stores",
-                  "disaggregated": true,
-                  "fields": [
-                    {"name": "store_id", "expression": "store_id"},
-                    {"name": "store_type", "expression": "store_type"},
-                    {"name": "region", "expression": "region"},
-                    {"name": "health_status", "expression": "health_status"},
-                    {"name": "health_score", "expression": "health_score"},
-                    {"name": "wait_time_sec", "expression": "wait_time_sec"},
-                    {"name": "return_rate_pct", "expression": "return_rate_pct"}
-                  ]
-                }
+              "invisibleColumns": [],
+              "allowHTMLByDefault": false,
+              "itemsPerPage": 25,
+              "paginationSize": "default",
+              "condensed": true,
+              "withRowNumber": false,
+              "frame": {
+                "title": "Performance by Region",
+                "showTitle": true,
+                "showDescription": false
               }
-            ],
-            "spec": {
-              "version": 3,
-              "widgetType": "table",
-              "encodings": {
-                "columns": [
-                  {"fieldName": "store_id", "displayName": "Store ID"},
-                  {"fieldName": "store_type", "displayName": "Type"},
-                  {"fieldName": "region", "displayName": "Region"},
-                  {"fieldName": "health_status", "displayName": "Status"},
-                  {"fieldName": "health_score", "displayName": "Score"},
-                  {"fieldName": "wait_time_sec", "displayName": "Wait Time (sec)"},
-                  {"fieldName": "return_rate_pct", "displayName": "Return Rate %"}
-                ]
-              },
-              "frame": {"title": "Stores Requiring Attention", "showTitle": true, "showDescription": false}
             }
           },
-          "position": {"x": 0, "y": 0, "width": 6, "height": 6}
-        },
-        {
-          "widget": {
-            "name": "health_by_type_bar",
-            "queries": [
-              {
-                "name": "main_query",
-                "query": {
-                  "datasetName": "ds_type_health",
-                  "disaggregated": true,
-                  "fields": [
-                    {"name": "store_type", "expression": "store_type"},
-                    {"name": "health_status", "expression": "health_status"},
-                    {"name": "count", "expression": "count"}
-                  ]
-                }
-              }
-            ],
-            "spec": {
-              "version": 3,
-              "widgetType": "bar",
-              "encodings": {
-                "x": {"fieldName": "store_type", "displayName": "Store Type"},
-                "y": {"fieldName": "count", "displayName": "Count"},
-                "color": {"fieldName": "health_status", "displayName": "Health Status"}
-              },
-              "frame": {"title": "Health by Store Type", "showTitle": true, "showDescription": false}
-            }
-          },
-          "position": {"x": 0, "y": 6, "width": 6, "height": 4}
+          "position": {
+            "x": 0,
+            "y": 8,
+            "width": 6,
+            "height": 4
+          }
         }
-      ]
+      ],
+      "pageType": "PAGE_TYPE_CANVAS"
     },
     {
       "name": "store_perf_page",
@@ -290,12 +688,21 @@
                 "name": "main_query",
                 "query": {
                   "datasetName": "ds_sales_trend",
-                  "disaggregated": true,
                   "fields": [
-                    {"name": "window_start", "expression": "window_start"},
-                    {"name": "region", "expression": "region"},
-                    {"name": "avg_sales", "expression": "avg_sales"}
-                  ]
+                    {
+                      "name": "region",
+                      "expression": "`region`"
+                    },
+                    {
+                      "name": "window_start",
+                      "expression": "`window_start`"
+                    },
+                    {
+                      "name": "sum(avg_sales)",
+                      "expression": "SUM(`avg_sales`)"
+                    }
+                  ],
+                  "disaggregated": false
                 }
               }
             ],
@@ -303,14 +710,41 @@
               "version": 3,
               "widgetType": "line",
               "encodings": {
-                "x": {"fieldName": "window_start", "displayName": "Time", "scale": {"type": "temporal"}},
-                "y": {"fieldName": "avg_sales", "displayName": "Avg Sales ($)"},
-                "color": {"fieldName": "region", "displayName": "Region"}
+                "x": {
+                  "fieldName": "window_start",
+                  "displayName": "Time",
+                  "scale": {
+                    "type": "temporal"
+                  }
+                },
+                "y": {
+                  "fieldName": "sum(avg_sales)",
+                  "displayName": "Average Sales",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "region",
+                  "displayName": "Region",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
               },
-              "frame": {"title": "Sales Trend by Region", "showTitle": true, "showDescription": false}
+              "frame": {
+                "title": "Sales Trend by Region",
+                "showTitle": true,
+                "showDescription": false
+              }
             }
           },
-          "position": {"x": 0, "y": 0, "width": 6, "height": 4}
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 6,
+            "height": 4
+          }
         },
         {
           "widget": {
@@ -320,12 +754,21 @@
                 "name": "main_query",
                 "query": {
                   "datasetName": "ds_wait_time_trend",
-                  "disaggregated": true,
                   "fields": [
-                    {"name": "window_start", "expression": "window_start"},
-                    {"name": "store_type", "expression": "store_type"},
-                    {"name": "avg_wait_time", "expression": "avg_wait_time"}
-                  ]
+                    {
+                      "name": "store_type",
+                      "expression": "`store_type`"
+                    },
+                    {
+                      "name": "window_start",
+                      "expression": "`window_start`"
+                    },
+                    {
+                      "name": "sum(avg_wait_time)",
+                      "expression": "SUM(`avg_wait_time`)"
+                    }
+                  ],
+                  "disaggregated": false
                 }
               }
             ],
@@ -333,14 +776,41 @@
               "version": 3,
               "widgetType": "line",
               "encodings": {
-                "x": {"fieldName": "window_start", "displayName": "Time", "scale": {"type": "temporal"}},
-                "y": {"fieldName": "avg_wait_time", "displayName": "Avg Wait Time (sec)"},
-                "color": {"fieldName": "store_type", "displayName": "Store Type"}
+                "x": {
+                  "fieldName": "window_start",
+                  "displayName": "Time",
+                  "scale": {
+                    "type": "temporal"
+                  }
+                },
+                "y": {
+                  "fieldName": "sum(avg_wait_time)",
+                  "displayName": "Average Wait Time",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "store_type",
+                  "displayName": "Store Type",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
               },
-              "frame": {"title": "Checkout Wait Time by Store Type", "showTitle": true, "showDescription": false}
+              "frame": {
+                "title": "Checkout Wait Time by Store Type",
+                "showTitle": true,
+                "showDescription": false
+              }
             }
           },
-          "position": {"x": 0, "y": 4, "width": 6, "height": 4}
+          "position": {
+            "x": 0,
+            "y": 4,
+            "width": 6,
+            "height": 4
+          }
         },
         {
           "widget": {
@@ -350,12 +820,21 @@
                 "name": "main_query",
                 "query": {
                   "datasetName": "ds_conversion_trend",
-                  "disaggregated": true,
                   "fields": [
-                    {"name": "window_start", "expression": "window_start"},
-                    {"name": "region", "expression": "region"},
-                    {"name": "avg_conversion", "expression": "avg_conversion"}
-                  ]
+                    {
+                      "name": "region",
+                      "expression": "`region`"
+                    },
+                    {
+                      "name": "window_start",
+                      "expression": "`window_start`"
+                    },
+                    {
+                      "name": "avg(avg_conversion)",
+                      "expression": "AVG(`avg_conversion`)"
+                    }
+                  ],
+                  "disaggregated": false
                 }
               }
             ],
@@ -363,16 +842,771 @@
               "version": 3,
               "widgetType": "area",
               "encodings": {
-                "x": {"fieldName": "window_start", "displayName": "Time", "scale": {"type": "temporal"}},
-                "y": {"fieldName": "avg_conversion", "displayName": "Conversion Rate %"},
-                "color": {"fieldName": "region", "displayName": "Region"}
+                "x": {
+                  "fieldName": "window_start",
+                  "displayName": "Time",
+                  "scale": {
+                    "type": "temporal"
+                  }
+                },
+                "y": {
+                  "fieldName": "avg(avg_conversion)",
+                  "displayName": "Average Conversion Rate",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "region",
+                  "displayName": "Region",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
               },
-              "frame": {"title": "Conversion Rate by Region", "showTitle": true, "showDescription": false}
+              "frame": {
+                "title": "Conversion Rate by Region",
+                "showTitle": true,
+                "showDescription": false
+              }
             }
           },
-          "position": {"x": 0, "y": 8, "width": 6, "height": 4}
+          "position": {
+            "x": 0,
+            "y": 8,
+            "width": 6,
+            "height": 4
+          }
         }
-      ]
+      ],
+      "pageType": "PAGE_TYPE_CANVAS"
+    },
+    {
+      "name": "store_health_page",
+      "displayName": "Store Health",
+      "layout": [
+        {
+          "widget": {
+            "name": "attention_table",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_attention_stores",
+                  "fields": [
+                    {
+                      "name": "store_id",
+                      "expression": "`store_id`"
+                    },
+                    {
+                      "name": "store_type",
+                      "expression": "`store_type`"
+                    },
+                    {
+                      "name": "region",
+                      "expression": "`region`"
+                    },
+                    {
+                      "name": "health_status",
+                      "expression": "`health_status`"
+                    },
+                    {
+                      "name": "health_score",
+                      "expression": "`health_score`"
+                    },
+                    {
+                      "name": "wait_time_sec",
+                      "expression": "`wait_time_sec`"
+                    },
+                    {
+                      "name": "return_rate_pct",
+                      "expression": "`return_rate_pct`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 1,
+              "widgetType": "table",
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "store_id",
+                    "booleanValues": ["false", "true"],
+                    "imageUrlTemplate": "{{ @ }}",
+                    "imageTitleTemplate": "{{ @ }}",
+                    "imageWidth": "",
+                    "imageHeight": "",
+                    "linkUrlTemplate": "{{ @ }}",
+                    "linkTextTemplate": "{{ @ }}",
+                    "linkTitleTemplate": "{{ @ }}",
+                    "linkOpenInNewTab": true,
+                    "type": "string",
+                    "displayAs": "string",
+                    "visible": true,
+                    "order": 100000,
+                    "title": "Store",
+                    "allowSearch": true,
+                    "alignContent": "left",
+                    "allowHTML": false,
+                    "highlightLinks": false,
+                    "useMonospaceFont": false,
+                    "preserveWhitespace": false
+                  },
+                  {
+                    "fieldName": "store_type",
+                    "booleanValues": ["false", "true"],
+                    "imageUrlTemplate": "{{ @ }}",
+                    "imageTitleTemplate": "{{ @ }}",
+                    "imageWidth": "",
+                    "imageHeight": "",
+                    "linkUrlTemplate": "{{ @ }}",
+                    "linkTextTemplate": "{{ @ }}",
+                    "linkTitleTemplate": "{{ @ }}",
+                    "linkOpenInNewTab": true,
+                    "type": "string",
+                    "displayAs": "string",
+                    "visible": true,
+                    "order": 100001,
+                    "title": "Store Type",
+                    "allowSearch": false,
+                    "alignContent": "left",
+                    "allowHTML": false,
+                    "highlightLinks": false,
+                    "useMonospaceFont": false,
+                    "preserveWhitespace": false
+                  },
+                  {
+                    "fieldName": "region",
+                    "booleanValues": ["false", "true"],
+                    "imageUrlTemplate": "{{ @ }}",
+                    "imageTitleTemplate": "{{ @ }}",
+                    "imageWidth": "",
+                    "imageHeight": "",
+                    "linkUrlTemplate": "{{ @ }}",
+                    "linkTextTemplate": "{{ @ }}",
+                    "linkTitleTemplate": "{{ @ }}",
+                    "linkOpenInNewTab": true,
+                    "type": "string",
+                    "displayAs": "string",
+                    "visible": true,
+                    "order": 100002,
+                    "title": "Region",
+                    "allowSearch": false,
+                    "alignContent": "left",
+                    "allowHTML": false,
+                    "highlightLinks": false,
+                    "useMonospaceFont": false,
+                    "preserveWhitespace": false
+                  },
+                  {
+                    "fieldName": "health_status",
+                    "booleanValues": ["false", "true"],
+                    "imageUrlTemplate": "{{ @ }}",
+                    "imageTitleTemplate": "{{ @ }}",
+                    "imageWidth": "",
+                    "imageHeight": "",
+                    "linkUrlTemplate": "{{ @ }}",
+                    "linkTextTemplate": "{{ @ }}",
+                    "linkTitleTemplate": "{{ @ }}",
+                    "linkOpenInNewTab": true,
+                    "type": "string",
+                    "displayAs": "string",
+                    "visible": true,
+                    "order": 100003,
+                    "title": "Health",
+                    "allowSearch": false,
+                    "alignContent": "left",
+                    "allowHTML": false,
+                    "highlightLinks": false,
+                    "useMonospaceFont": false,
+                    "preserveWhitespace": false
+                  },
+                  {
+                    "fieldName": "health_score",
+                    "numberFormat": "0",
+                    "booleanValues": ["false", "true"],
+                    "imageUrlTemplate": "{{ @ }}",
+                    "imageTitleTemplate": "{{ @ }}",
+                    "imageWidth": "",
+                    "imageHeight": "",
+                    "linkUrlTemplate": "{{ @ }}",
+                    "linkTextTemplate": "{{ @ }}",
+                    "linkTitleTemplate": "{{ @ }}",
+                    "linkOpenInNewTab": true,
+                    "type": "integer",
+                    "displayAs": "number",
+                    "visible": true,
+                    "order": 100004,
+                    "title": "Health Score",
+                    "allowSearch": false,
+                    "alignContent": "right",
+                    "allowHTML": false,
+                    "highlightLinks": false,
+                    "useMonospaceFont": false,
+                    "preserveWhitespace": false
+                  },
+                  {
+                    "fieldName": "wait_time_sec",
+                    "numberFormat": "0.00",
+                    "booleanValues": ["false", "true"],
+                    "imageUrlTemplate": "{{ @ }}",
+                    "imageTitleTemplate": "{{ @ }}",
+                    "imageWidth": "",
+                    "imageHeight": "",
+                    "linkUrlTemplate": "{{ @ }}",
+                    "linkTextTemplate": "{{ @ }}",
+                    "linkTitleTemplate": "{{ @ }}",
+                    "linkOpenInNewTab": true,
+                    "type": "float",
+                    "displayAs": "number",
+                    "visible": true,
+                    "order": 100005,
+                    "title": "Checkout Wait Time Secs",
+                    "allowSearch": false,
+                    "alignContent": "right",
+                    "allowHTML": false,
+                    "highlightLinks": false,
+                    "useMonospaceFont": false,
+                    "preserveWhitespace": false
+                  },
+                  {
+                    "fieldName": "return_rate_pct",
+                    "numberFormat": "0.00",
+                    "booleanValues": ["false", "true"],
+                    "imageUrlTemplate": "{{ @ }}",
+                    "imageTitleTemplate": "{{ @ }}",
+                    "imageWidth": "",
+                    "imageHeight": "",
+                    "linkUrlTemplate": "{{ @ }}",
+                    "linkTextTemplate": "{{ @ }}",
+                    "linkTitleTemplate": "{{ @ }}",
+                    "linkOpenInNewTab": true,
+                    "type": "float",
+                    "displayAs": "number",
+                    "visible": true,
+                    "order": 100006,
+                    "title": "Return Rate %",
+                    "allowSearch": false,
+                    "alignContent": "right",
+                    "allowHTML": false,
+                    "highlightLinks": false,
+                    "useMonospaceFont": false,
+                    "preserveWhitespace": false
+                  }
+                ]
+              },
+              "invisibleColumns": [],
+              "allowHTMLByDefault": false,
+              "itemsPerPage": 25,
+              "paginationSize": "default",
+              "condensed": true,
+              "withRowNumber": false,
+              "frame": {
+                "showDescription": false,
+                "title": "Stores Requiring Attention",
+                "showTitle": true
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 6,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "health_by_type_bar",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_type_health",
+                  "fields": [
+                    {
+                      "name": "store_type",
+                      "expression": "`store_type`"
+                    },
+                    {
+                      "name": "health_status",
+                      "expression": "`health_status`"
+                    },
+                    {
+                      "name": "sum(count)",
+                      "expression": "SUM(`count`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "health_status",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "sum(count)",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "store_type",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
+              },
+              "frame": {
+                "title": "Health by Store Type",
+                "showTitle": true,
+                "showDescription": false
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 6,
+            "width": 6,
+            "height": 4
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_CANVAS"
+    },
+    {
+      "name": "drive_through_page",
+      "displayName": "Drive-Through Performance",
+      "layout": [
+        {
+          "widget": {
+            "name": "dt_avg_wait_counter",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_dt_avg_wait",
+                  "fields": [
+                    {
+                      "name": "avg_wait",
+                      "expression": "`avg_wait`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "avg_wait",
+                  "displayName": "Avg Wait Time"
+                }
+              },
+              "frame": {
+                "title": "Avg Drive-Through Wait (sec)",
+                "showTitle": true,
+                "showDescription": false
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 2,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "dt_accuracy_counter",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_dt_accuracy",
+                  "fields": [
+                    {
+                      "name": "avg_accuracy",
+                      "expression": "`avg_accuracy`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "avg_accuracy",
+                  "displayName": "Order Accuracy"
+                }
+              },
+              "frame": {
+                "title": "Avg Order Accuracy (%)",
+                "showTitle": true,
+                "showDescription": false
+              }
+            }
+          },
+          "position": {
+            "x": 2,
+            "y": 0,
+            "width": 2,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "dt_throughput_counter",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_dt_throughput",
+                  "fields": [
+                    {
+                      "name": "avg_throughput",
+                      "expression": "`avg_throughput`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "avg_throughput",
+                  "displayName": "Throughput"
+                }
+              },
+              "frame": {
+                "title": "Avg Throughput (cars/hr)",
+                "showTitle": true,
+                "showDescription": false
+              }
+            }
+          },
+          "position": {
+            "x": 4,
+            "y": 0,
+            "width": 2,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "dt_performance_pie",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_dt_performance_grade",
+                  "fields": [
+                    {
+                      "name": "countdistinct(count)",
+                      "expression": "COUNT(DISTINCT `count`)"
+                    },
+                    {
+                      "name": "performance_grade",
+                      "expression": "`performance_grade`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "pie",
+              "encodings": {
+                "angle": {
+                  "fieldName": "countdistinct(count)",
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "displayName": "Store Count"
+                },
+                "color": {
+                  "fieldName": "performance_grade",
+                  "displayName": "Performance Grade",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
+              },
+              "frame": {
+                "title": "Performance Grade Distribution",
+                "showTitle": true,
+                "showDescription": false
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 2,
+            "width": 3,
+            "height": 4
+          }
+        },
+        {
+          "widget": {
+            "name": "dt_wait_by_region",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_dt_region_perf",
+                  "fields": [
+                    {
+                      "name": "region",
+                      "expression": "`region`"
+                    },
+                    {
+                      "name": "sum(avg_wait)",
+                      "expression": "SUM(`avg_wait`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "region",
+                  "scale": {
+                    "type": "categorical"
+                  },
+                  "displayName": "Region"
+                },
+                "y": {
+                  "fieldName": "sum(avg_wait)",
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "displayName": "Avg Wait Time (sec)"
+                },
+                "color": {
+                  "fieldName": "region",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
+              },
+              "frame": {
+                "title": "Wait Time by Region",
+                "showTitle": true,
+                "showDescription": false
+              }
+            }
+          },
+          "position": {
+            "x": 3,
+            "y": 2,
+            "width": 3,
+            "height": 4
+          }
+        },
+        {
+          "widget": {
+            "name": "dt_worst_stores",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_dt_worst_stores",
+                  "fields": [
+                    {
+                      "name": "store_id",
+                      "expression": "`store_id`"
+                    },
+                    {
+                      "name": "region",
+                      "expression": "`region`"
+                    },
+                    {
+                      "name": "avg_wait",
+                      "expression": "`avg_wait`"
+                    },
+                    {
+                      "name": "avg_accuracy",
+                      "expression": "`avg_accuracy`"
+                    },
+                    {
+                      "name": "performance_grade",
+                      "expression": "`performance_grade`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 1,
+              "widgetType": "table",
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "store_id",
+                    "booleanValues": ["false", "true"],
+                    "imageUrlTemplate": "{{ @ }}",
+                    "imageTitleTemplate": "{{ @ }}",
+                    "imageWidth": "",
+                    "imageHeight": "",
+                    "linkUrlTemplate": "{{ @ }}",
+                    "linkTextTemplate": "{{ @ }}",
+                    "linkTitleTemplate": "{{ @ }}",
+                    "linkOpenInNewTab": true,
+                    "type": "string",
+                    "displayAs": "string",
+                    "visible": true,
+                    "order": 100000,
+                    "title": "Store",
+                    "allowSearch": true,
+                    "alignContent": "left",
+                    "allowHTML": false,
+                    "highlightLinks": false,
+                    "useMonospaceFont": false,
+                    "preserveWhitespace": false
+                  },
+                  {
+                    "fieldName": "region",
+                    "booleanValues": ["false", "true"],
+                    "imageUrlTemplate": "{{ @ }}",
+                    "imageTitleTemplate": "{{ @ }}",
+                    "imageWidth": "",
+                    "imageHeight": "",
+                    "linkUrlTemplate": "{{ @ }}",
+                    "linkTextTemplate": "{{ @ }}",
+                    "linkTitleTemplate": "{{ @ }}",
+                    "linkOpenInNewTab": true,
+                    "type": "string",
+                    "displayAs": "string",
+                    "visible": true,
+                    "order": 100001,
+                    "title": "Region",
+                    "allowSearch": false,
+                    "alignContent": "left",
+                    "allowHTML": false,
+                    "highlightLinks": false,
+                    "useMonospaceFont": false,
+                    "preserveWhitespace": false
+                  },
+                  {
+                    "fieldName": "avg_wait",
+                    "numberFormat": "0.00",
+                    "booleanValues": ["false", "true"],
+                    "imageUrlTemplate": "{{ @ }}",
+                    "imageTitleTemplate": "{{ @ }}",
+                    "imageWidth": "",
+                    "imageHeight": "",
+                    "linkUrlTemplate": "{{ @ }}",
+                    "linkTextTemplate": "{{ @ }}",
+                    "linkTitleTemplate": "{{ @ }}",
+                    "linkOpenInNewTab": true,
+                    "type": "float",
+                    "displayAs": "number",
+                    "visible": true,
+                    "order": 100002,
+                    "title": "Wait Time (sec)",
+                    "allowSearch": false,
+                    "alignContent": "right",
+                    "allowHTML": false,
+                    "highlightLinks": false,
+                    "useMonospaceFont": false,
+                    "preserveWhitespace": false
+                  },
+                  {
+                    "fieldName": "avg_accuracy",
+                    "numberFormat": "0.00",
+                    "booleanValues": ["false", "true"],
+                    "imageUrlTemplate": "{{ @ }}",
+                    "imageTitleTemplate": "{{ @ }}",
+                    "imageWidth": "",
+                    "imageHeight": "",
+                    "linkUrlTemplate": "{{ @ }}",
+                    "linkTextTemplate": "{{ @ }}",
+                    "linkTitleTemplate": "{{ @ }}",
+                    "linkOpenInNewTab": true,
+                    "type": "float",
+                    "displayAs": "number",
+                    "visible": true,
+                    "order": 100003,
+                    "title": "Accuracy %",
+                    "allowSearch": false,
+                    "alignContent": "right",
+                    "allowHTML": false,
+                    "highlightLinks": false,
+                    "useMonospaceFont": false,
+                    "preserveWhitespace": false
+                  },
+                  {
+                    "fieldName": "performance_grade",
+                    "booleanValues": ["false", "true"],
+                    "imageUrlTemplate": "{{ @ }}",
+                    "imageTitleTemplate": "{{ @ }}",
+                    "imageWidth": "",
+                    "imageHeight": "",
+                    "linkUrlTemplate": "{{ @ }}",
+                    "linkTextTemplate": "{{ @ }}",
+                    "linkTitleTemplate": "{{ @ }}",
+                    "linkOpenInNewTab": true,
+                    "type": "string",
+                    "displayAs": "string",
+                    "visible": true,
+                    "order": 100004,
+                    "title": "Grade",
+                    "allowSearch": false,
+                    "alignContent": "left",
+                    "allowHTML": false,
+                    "highlightLinks": false,
+                    "useMonospaceFont": false,
+                    "preserveWhitespace": false
+                  }
+                ]
+              },
+              "invisibleColumns": [],
+              "allowHTMLByDefault": false,
+              "itemsPerPage": 25,
+              "paginationSize": "default",
+              "condensed": true,
+              "withRowNumber": false,
+              "frame": {
+                "title": "Stores Needing Improvement",
+                "showTitle": true,
+                "showDescription": false
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 6,
+            "width": 6,
+            "height": 4
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_CANVAS"
     },
     {
       "name": "events_page",
@@ -386,35 +1620,201 @@
                 "name": "main_query",
                 "query": {
                   "datasetName": "ds_critical_events",
-                  "disaggregated": true,
                   "fields": [
-                    {"name": "event_timestamp", "expression": "event_timestamp"},
-                    {"name": "store_id", "expression": "store_id"},
-                    {"name": "region", "expression": "region"},
-                    {"name": "event_category", "expression": "event_category"},
-                    {"name": "severity_name", "expression": "severity_name"},
-                    {"name": "event_message", "expression": "event_message"}
-                  ]
+                    {
+                      "name": "event_timestamp",
+                      "expression": "`event_timestamp`"
+                    },
+                    {
+                      "name": "store_id",
+                      "expression": "`store_id`"
+                    },
+                    {
+                      "name": "region",
+                      "expression": "`region`"
+                    },
+                    {
+                      "name": "event_category",
+                      "expression": "`event_category`"
+                    },
+                    {
+                      "name": "severity_name",
+                      "expression": "`severity_name`"
+                    },
+                    {
+                      "name": "event_message",
+                      "expression": "`event_message`"
+                    }
+                  ],
+                  "disaggregated": true
                 }
               }
             ],
             "spec": {
-              "version": 3,
+              "version": 1,
               "widgetType": "table",
               "encodings": {
                 "columns": [
-                  {"fieldName": "event_timestamp", "displayName": "Time"},
-                  {"fieldName": "store_id", "displayName": "Store"},
-                  {"fieldName": "region", "displayName": "Region"},
-                  {"fieldName": "event_category", "displayName": "Category"},
-                  {"fieldName": "severity_name", "displayName": "Severity"},
-                  {"fieldName": "event_message", "displayName": "Message"}
+                  {
+                    "fieldName": "event_timestamp",
+                    "dateTimeFormat": "yyyy-DD-mm HH:00",
+                    "booleanValues": ["false", "true"],
+                    "imageUrlTemplate": "{{ @ }}",
+                    "imageTitleTemplate": "{{ @ }}",
+                    "imageWidth": "",
+                    "imageHeight": "",
+                    "linkUrlTemplate": "{{ @ }}",
+                    "linkTextTemplate": "{{ @ }}",
+                    "linkTitleTemplate": "{{ @ }}",
+                    "linkOpenInNewTab": true,
+                    "type": "datetime",
+                    "displayAs": "datetime",
+                    "visible": true,
+                    "order": 100000,
+                    "title": "Time",
+                    "allowSearch": false,
+                    "alignContent": "right",
+                    "allowHTML": false,
+                    "highlightLinks": false,
+                    "useMonospaceFont": false,
+                    "preserveWhitespace": false
+                  },
+                  {
+                    "fieldName": "store_id",
+                    "booleanValues": ["false", "true"],
+                    "imageUrlTemplate": "{{ @ }}",
+                    "imageTitleTemplate": "{{ @ }}",
+                    "imageWidth": "",
+                    "imageHeight": "",
+                    "linkUrlTemplate": "{{ @ }}",
+                    "linkTextTemplate": "{{ @ }}",
+                    "linkTitleTemplate": "{{ @ }}",
+                    "linkOpenInNewTab": true,
+                    "type": "string",
+                    "displayAs": "string",
+                    "visible": true,
+                    "order": 100001,
+                    "title": "Store",
+                    "allowSearch": false,
+                    "alignContent": "left",
+                    "allowHTML": false,
+                    "highlightLinks": false,
+                    "useMonospaceFont": false,
+                    "preserveWhitespace": false
+                  },
+                  {
+                    "fieldName": "region",
+                    "booleanValues": ["false", "true"],
+                    "imageUrlTemplate": "{{ @ }}",
+                    "imageTitleTemplate": "{{ @ }}",
+                    "imageWidth": "",
+                    "imageHeight": "",
+                    "linkUrlTemplate": "{{ @ }}",
+                    "linkTextTemplate": "{{ @ }}",
+                    "linkTitleTemplate": "{{ @ }}",
+                    "linkOpenInNewTab": true,
+                    "type": "string",
+                    "displayAs": "string",
+                    "visible": true,
+                    "order": 100002,
+                    "title": "Region",
+                    "allowSearch": false,
+                    "alignContent": "left",
+                    "allowHTML": false,
+                    "highlightLinks": false,
+                    "useMonospaceFont": false,
+                    "preserveWhitespace": false
+                  },
+                  {
+                    "fieldName": "event_category",
+                    "booleanValues": ["false", "true"],
+                    "imageUrlTemplate": "{{ @ }}",
+                    "imageTitleTemplate": "{{ @ }}",
+                    "imageWidth": "",
+                    "imageHeight": "",
+                    "linkUrlTemplate": "{{ @ }}",
+                    "linkTextTemplate": "{{ @ }}",
+                    "linkTitleTemplate": "{{ @ }}",
+                    "linkOpenInNewTab": true,
+                    "type": "string",
+                    "displayAs": "string",
+                    "visible": true,
+                    "order": 100003,
+                    "title": "Event Type",
+                    "allowSearch": false,
+                    "alignContent": "left",
+                    "allowHTML": false,
+                    "highlightLinks": false,
+                    "useMonospaceFont": false,
+                    "preserveWhitespace": false
+                  },
+                  {
+                    "fieldName": "severity_name",
+                    "booleanValues": ["false", "true"],
+                    "imageUrlTemplate": "{{ @ }}",
+                    "imageTitleTemplate": "{{ @ }}",
+                    "imageWidth": "",
+                    "imageHeight": "",
+                    "linkUrlTemplate": "{{ @ }}",
+                    "linkTextTemplate": "{{ @ }}",
+                    "linkTitleTemplate": "{{ @ }}",
+                    "linkOpenInNewTab": true,
+                    "type": "string",
+                    "displayAs": "string",
+                    "visible": true,
+                    "order": 100004,
+                    "title": "Severity",
+                    "allowSearch": false,
+                    "alignContent": "left",
+                    "allowHTML": false,
+                    "highlightLinks": false,
+                    "useMonospaceFont": false,
+                    "preserveWhitespace": false
+                  },
+                  {
+                    "fieldName": "event_message",
+                    "booleanValues": ["false", "true"],
+                    "imageUrlTemplate": "{{ @ }}",
+                    "imageTitleTemplate": "{{ @ }}",
+                    "imageWidth": "",
+                    "imageHeight": "",
+                    "linkUrlTemplate": "{{ @ }}",
+                    "linkTextTemplate": "{{ @ }}",
+                    "linkTitleTemplate": "{{ @ }}",
+                    "linkOpenInNewTab": true,
+                    "type": "string",
+                    "displayAs": "string",
+                    "visible": true,
+                    "order": 100005,
+                    "title": "Event Message",
+                    "allowSearch": false,
+                    "alignContent": "left",
+                    "allowHTML": false,
+                    "highlightLinks": false,
+                    "useMonospaceFont": false,
+                    "preserveWhitespace": false
+                  }
                 ]
               },
-              "frame": {"title": "Recent Critical Events", "showTitle": true, "showDescription": false}
+              "invisibleColumns": [],
+              "allowHTMLByDefault": false,
+              "itemsPerPage": 25,
+              "paginationSize": "default",
+              "condensed": true,
+              "withRowNumber": false,
+              "frame": {
+                "showDescription": false,
+                "title": "Recent Critical Events",
+                "showTitle": true
+              }
             }
           },
-          "position": {"x": 0, "y": 0, "width": 6, "height": 5}
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 6,
+            "height": 5
+          }
         },
         {
           "widget": {
@@ -424,11 +1824,17 @@
                 "name": "main_query",
                 "query": {
                   "datasetName": "ds_category_dist",
-                  "disaggregated": true,
                   "fields": [
-                    {"name": "event_category", "expression": "event_category"},
-                    {"name": "count", "expression": "count"}
-                  ]
+                    {
+                      "name": "countdistinct(count)",
+                      "expression": "COUNT(DISTINCT `count`)"
+                    },
+                    {
+                      "name": "event_category",
+                      "expression": "`event_category`"
+                    }
+                  ],
+                  "disaggregated": false
                 }
               }
             ],
@@ -436,13 +1842,34 @@
               "version": 3,
               "widgetType": "pie",
               "encodings": {
-                "angle": {"fieldName": "count", "displayName": "Count"},
-                "color": {"fieldName": "event_category", "displayName": "Category"}
+                "angle": {
+                  "fieldName": "countdistinct(count)",
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "displayName": "Event Count"
+                },
+                "color": {
+                  "fieldName": "event_category",
+                  "displayName": "Event Category",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
               },
-              "frame": {"title": "Events by Category", "showTitle": true, "showDescription": false}
+              "frame": {
+                "title": "Events by Category",
+                "showTitle": true,
+                "showDescription": false
+              }
             }
           },
-          "position": {"x": 0, "y": 5, "width": 3, "height": 4}
+          "position": {
+            "x": 0,
+            "y": 5,
+            "width": 3,
+            "height": 4
+          }
         },
         {
           "widget": {
@@ -452,11 +1879,17 @@
                 "name": "main_query",
                 "query": {
                   "datasetName": "ds_severity_dist",
-                  "disaggregated": true,
                   "fields": [
-                    {"name": "severity_name", "expression": "severity_name"},
-                    {"name": "count", "expression": "count"}
-                  ]
+                    {
+                      "name": "severity_name",
+                      "expression": "`severity_name`"
+                    },
+                    {
+                      "name": "sum(count)",
+                      "expression": "SUM(`count`)"
+                    }
+                  ],
+                  "disaggregated": false
                 }
               }
             ],
@@ -464,93 +1897,43 @@
               "version": 3,
               "widgetType": "bar",
               "encodings": {
-                "x": {"fieldName": "severity_name", "displayName": "Severity"},
-                "y": {"fieldName": "count", "displayName": "Count"}
+                "x": {
+                  "fieldName": "severity_name",
+                  "displayName": "Severity Name",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "sum(count)",
+                  "displayName": "Count of Events",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "severity_name",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
               },
-              "frame": {"title": "Events by Severity", "showTitle": true, "showDescription": false}
+              "frame": {
+                "title": "Events by Severity",
+                "showTitle": true,
+                "showDescription": false
+              }
             }
           },
-          "position": {"x": 3, "y": 5, "width": 3, "height": 4}
+          "position": {
+            "x": 3,
+            "y": 5,
+            "width": 3,
+            "height": 4
+          }
         }
-      ]
-    }
-  ],
-  "datasets": [
-    {
-      "name": "ds_store_count",
-      "displayName": "Total Store Count",
-      "query": "SELECT COUNT(DISTINCT store_id) as total_stores FROM retail_analytics.gold.gold_store_health"
-    },
-    {
-      "name": "ds_critical_count",
-      "displayName": "Critical Store Count",
-      "query": "SELECT COUNT(*) as critical_stores FROM retail_analytics.gold.gold_store_health WHERE health_status IN ('Critical', 'Poor') OR requires_attention = true"
-    },
-    {
-      "name": "ds_avg_health",
-      "displayName": "Average Health Score",
-      "query": "SELECT ROUND(AVG(health_score), 1) as avg_health_score FROM retail_analytics.gold.gold_store_health"
-    },
-    {
-      "name": "ds_total_sales",
-      "displayName": "Total Sales",
-      "query": "SELECT ROUND(SUM(avg_value), 0) as total_sales FROM retail_analytics.gold.gold_store_performance_5min WHERE metric_name = 'hourly_sales' AND window_start >= current_timestamp() - INTERVAL 24 HOURS"
-    },
-    {
-      "name": "ds_health_distribution",
-      "displayName": "Health Status Distribution",
-      "query": "SELECT health_status, COUNT(*) as count FROM retail_analytics.gold.gold_store_health GROUP BY health_status ORDER BY count DESC"
-    },
-    {
-      "name": "ds_store_types",
-      "displayName": "Store Type Count",
-      "query": "SELECT store_type, COUNT(*) as count FROM retail_analytics.gold.gold_store_health GROUP BY store_type ORDER BY count DESC"
-    },
-    {
-      "name": "ds_region_summary",
-      "displayName": "Region Summary",
-      "query": "SELECT region, COUNT(*) as stores, ROUND(AVG(health_score), 1) as avg_health, ROUND(AVG(current_hourly_sales), 2) as avg_sales, SUM(critical_event_count_1h) as critical_events FROM retail_analytics.gold.gold_store_health GROUP BY region ORDER BY avg_health ASC"
-    },
-    {
-      "name": "ds_attention_stores",
-      "displayName": "Stores Needing Attention",
-      "query": "SELECT store_id, store_type, region, health_status, health_score, current_wait_time_sec as wait_time_sec, current_return_rate_pct as return_rate_pct FROM retail_analytics.gold.gold_store_health WHERE requires_attention = true OR health_status IN ('Critical', 'Poor') ORDER BY health_score ASC LIMIT 50"
-    },
-    {
-      "name": "ds_type_health",
-      "displayName": "Store Type by Health",
-      "query": "SELECT store_type, health_status, COUNT(*) as count FROM retail_analytics.gold.gold_store_health GROUP BY store_type, health_status ORDER BY store_type, health_status"
-    },
-    {
-      "name": "ds_sales_trend",
-      "displayName": "Sales Trend",
-      "query": "SELECT window_start, region, ROUND(AVG(avg_value), 2) as avg_sales FROM retail_analytics.gold.gold_store_performance_5min WHERE metric_name = 'hourly_sales' AND window_start >= current_timestamp() - INTERVAL 6 HOURS GROUP BY window_start, region ORDER BY window_start"
-    },
-    {
-      "name": "ds_wait_time_trend",
-      "displayName": "Wait Time Trend",
-      "query": "SELECT window_start, store_type, ROUND(AVG(avg_value), 1) as avg_wait_time FROM retail_analytics.gold.gold_store_performance_5min WHERE metric_name = 'checkout_wait_time_sec' AND window_start >= current_timestamp() - INTERVAL 6 HOURS GROUP BY window_start, store_type ORDER BY window_start"
-    },
-    {
-      "name": "ds_conversion_trend",
-      "displayName": "Conversion Trend",
-      "query": "SELECT window_start, region, ROUND(AVG(avg_value), 2) as avg_conversion FROM retail_analytics.gold.gold_store_performance_5min WHERE metric_name = 'conversion_rate_pct' AND window_start >= current_timestamp() - INTERVAL 6 HOURS GROUP BY window_start, region ORDER BY window_start"
-    },
-    {
-      "name": "ds_critical_events",
-      "displayName": "Critical Events",
-      "query": "SELECT event_timestamp, store_id, region, event_category, severity_name, event_message FROM retail_analytics.gold.gold_store_events WHERE is_critical = true AND event_timestamp >= current_timestamp() - INTERVAL 24 HOURS ORDER BY event_timestamp DESC LIMIT 100"
-    },
-    {
-      "name": "ds_category_dist",
-      "displayName": "Category Distribution",
-      "query": "SELECT event_category, COUNT(*) as count FROM retail_analytics.gold.gold_store_events WHERE event_timestamp >= current_timestamp() - INTERVAL 24 HOURS GROUP BY event_category ORDER BY count DESC"
-    },
-    {
-      "name": "ds_severity_dist",
-      "displayName": "Severity Distribution",
-      "query": "SELECT severity_name, COUNT(*) as count FROM retail_analytics.gold.gold_store_events WHERE event_timestamp >= current_timestamp() - INTERVAL 24 HOURS GROUP BY severity_name ORDER BY count DESC"
+      ],
+      "pageType": "PAGE_TYPE_CANVAS"
     }
   ]
 }
-

@@ -49,7 +49,7 @@ WITH METRICS
 LANGUAGE YAML
 AS $$
   version: 1.1
-  comment: "Store performance KPIs - sales, wait times, conversion, basket size"
+  comment: "Store performance KPIs for apparel and fast food stores"
   source: retail_analytics.gold.gold_store_performance_5min
   
   dimensions:
@@ -65,9 +65,13 @@ AS $$
       expr: store_id
       comment: "Unique identifier for retail store"
     
+    - name: Store Category
+      expr: store_category
+      comment: "Store category: fast_food or apparel"
+    
     - name: Store Type
       expr: store_type
-      comment: "Type of store: flagship, mall, outlet, express, warehouse"
+      comment: "Type of store (varies by category)"
     
     - name: Region
       expr: region
@@ -83,7 +87,7 @@ AS $$
     
     - name: Metric Name
       expr: metric_name
-      comment: "Type of metric: hourly_sales, checkout_wait_time_sec, conversion_rate_pct, etc."
+      comment: "Type of metric (varies by category)"
     
     - name: Metric Unit
       expr: metric_unit
@@ -161,13 +165,17 @@ WITH METRICS
 LANGUAGE YAML
 AS $$
   version: 1.1
-  comment: "Store health scores and current operational metrics"
+  comment: "Store health scores and operational metrics (apparel and fast food)"
   source: retail_analytics.gold.gold_store_health
   
   dimensions:
     - name: Store ID
       expr: store_id
       comment: "Unique store identifier"
+    
+    - name: Store Category
+      expr: store_category
+      comment: "Store category: fast_food or apparel"
     
     - name: Store Type
       expr: store_type
@@ -262,7 +270,7 @@ WITH METRICS
 LANGUAGE YAML
 AS $$
   version: 1.1
-  comment: "Store event metrics - transactions, issues, inventory alerts"
+  comment: "Store event metrics for apparel and fast food stores"
   source: retail_analytics.gold.gold_store_events
   
   dimensions:
@@ -274,17 +282,21 @@ AS $$
       expr: store_id
       comment: "Store that generated the event"
     
+    - name: Store Category
+      expr: store_category
+      comment: "Store category: fast_food or apparel"
+    
     - name: Region
       expr: region
       comment: "Store region"
     
     - name: Event Type
       expr: event_type
-      comment: "Type of event: TRANSACTION, PAYMENT_DECLINED, STOCKOUT, etc."
+      comment: "Type of event (varies by store category)"
     
     - name: Event Category
       expr: event_category
-      comment: "Category: sales, checkout_issue, returns, inventory, security, loyalty"
+      comment: "Event category (includes drive_through, kitchen_ops, food_safety for fast food)"
     
     - name: Severity
       expr: severity
@@ -356,7 +368,7 @@ WITH METRICS
 LANGUAGE YAML
 AS $$
   version: 1.1
-  comment: "Store performance metrics aggregated by geographic region"
+  comment: "Store performance metrics aggregated by geographic region (apparel and fast food)"
   source: retail_analytics.gold.gold_metrics_by_region
   
   dimensions:
@@ -442,7 +454,7 @@ WITH METRICS
 LANGUAGE YAML
 AS $$
   version: 1.1
-  comment: "Hourly KPI summary metrics for executive retail dashboards"
+  comment: "Hourly KPI summary metrics for executive dashboards (apparel and fast food)"
   source: retail_analytics.gold.gold_kpi_hourly
   
   dimensions:
@@ -504,6 +516,104 @@ ORDER BY `Metric Name`;
 -- COMMAND ----------
 
 -- MAGIC %md
+-- MAGIC ## Metric View 6: Drive-Through Performance (Fast Food Only)
+-- MAGIC 
+-- MAGIC Drive-through specific metrics for fast food store analysis.
+
+-- COMMAND ----------
+
+CREATE OR REPLACE VIEW retail_analytics.metrics.mv_drive_through_performance
+WITH METRICS
+LANGUAGE YAML
+AS $$
+  version: 1.1
+  comment: "Drive-through performance metrics for fast food stores"
+  source: retail_analytics.gold.gold_drive_through_performance
+  
+  dimensions:
+    - name: Time Window Start
+      expr: window_start
+      comment: "Start of aggregation window"
+    
+    - name: Time Window End
+      expr: window_end
+      comment: "End of aggregation window"
+    
+    - name: Store ID
+      expr: store_id
+      comment: "Fast food store identifier"
+    
+    - name: Store Type
+      expr: store_type
+      comment: "Type of fast food store"
+    
+    - name: Region
+      expr: region
+      comment: "Store region"
+    
+    - name: Brand
+      expr: brand
+      comment: "Fast food brand"
+    
+    - name: Time Period
+      expr: time_period
+      comment: "Time period: breakfast_peak, lunch_peak, dinner_peak, off_peak"
+    
+    - name: Performance Grade
+      expr: performance_grade
+      comment: "Performance grade: Excellent, Good, Fair, Needs_Improvement"
+  
+  measures:
+    - name: Avg Wait Time (sec)
+      expr: AVG(avg_wait_time_sec)
+      comment: "Average drive-through wait time in seconds"
+    
+    - name: P95 Wait Time (sec)
+      expr: AVG(p95_wait_time_sec)
+      comment: "95th percentile drive-through wait time"
+    
+    - name: Avg Throughput
+      expr: AVG(avg_throughput_per_hour)
+      comment: "Average cars served per hour"
+    
+    - name: Avg Order Accuracy
+      expr: AVG(avg_order_accuracy_pct)
+      comment: "Average order accuracy percentage"
+    
+    - name: Avg Speaker to Window Time
+      expr: AVG(avg_speaker_to_window_sec)
+      comment: "Average time from speaker to window"
+    
+    - name: P95 Speaker to Window Time
+      expr: AVG(p95_speaker_to_window_sec)
+      comment: "95th percentile speaker to window time"
+    
+    - name: Avg Mobile Pickup Time
+      expr: AVG(avg_mobile_pickup_sec)
+      comment: "Average mobile order pickup time"
+    
+    - name: Store Count
+      expr: COUNT(DISTINCT store_id)
+      comment: "Number of fast food stores"
+$$;
+
+-- COMMAND ----------
+
+-- Test drive-through performance metric view
+SELECT
+  `Performance Grade`,
+  `Time Period`,
+  MEASURE(`Store Count`),
+  MEASURE(`Avg Wait Time (sec)`),
+  MEASURE(`Avg Order Accuracy`),
+  MEASURE(`Avg Throughput`)
+FROM retail_analytics.metrics.mv_drive_through_performance
+GROUP BY `Performance Grade`, `Time Period`
+ORDER BY `Performance Grade`, `Time Period`;
+
+-- COMMAND ----------
+
+-- MAGIC %md
 -- MAGIC ## List All Metric Views
 
 -- COMMAND ----------
@@ -518,11 +628,12 @@ SHOW VIEWS IN retail_analytics.metrics;
 -- MAGIC 
 -- MAGIC | Metric View | Source Table | Key Measures |
 -- MAGIC |-------------|--------------|--------------|
--- MAGIC | `mv_store_performance` | `gold_store_performance_5min` | Avg/Max/P95 values, Anomaly count/rate |
--- MAGIC | `mv_store_health` | `gold_store_health` | Health score, Wait time, Conversion, Inventory issues |
--- MAGIC | `mv_store_events` | `gold_store_events` | Event count, Critical rate, Affected stores |
--- MAGIC | `mv_regional_performance` | `gold_metrics_by_region` | Regional metrics, Anomaly rate |
--- MAGIC | `mv_kpi_dashboard` | `gold_kpi_hourly` | Hourly KPIs, Event summaries |
+-- MAGIC | `mv_store_performance` | `gold_store_performance_5min` | Avg/Max/P95 values, Anomaly count/rate (apparel + fast food) |
+-- MAGIC | `mv_store_health` | `gold_store_health` | Health score, Category-aware metrics (apparel + fast food) |
+-- MAGIC | `mv_store_events` | `gold_store_events` | Event count, Critical rate, Affected stores (apparel + fast food) |
+-- MAGIC | `mv_regional_performance` | `gold_metrics_by_region` | Regional metrics, Anomaly rate (apparel + fast food) |
+-- MAGIC | `mv_kpi_dashboard` | `gold_kpi_hourly` | Hourly KPIs, Event summaries (apparel + fast food) |
+-- MAGIC | `mv_drive_through_performance` | `gold_drive_through_performance` | Drive-through wait time, throughput, accuracy (fast food only) |
 -- MAGIC 
 -- MAGIC ## Query Examples
 -- MAGIC 

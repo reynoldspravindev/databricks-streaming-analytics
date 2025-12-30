@@ -15,7 +15,7 @@
 -- MAGIC **Retail Store Performance Analytics**
 -- MAGIC 
 -- MAGIC ## Description
--- MAGIC AI-powered analytics for real-time store performance monitoring, operational health, sales analysis, and incident management. Ask questions about sales, checkout wait times, conversion rates, inventory issues, and store events across your retail operations.
+-- MAGIC AI-powered analytics for real-time store performance monitoring across apparel retail and fast food operations. Monitor operational health, sales analysis, drive-through performance, and incident management. Ask questions about sales, wait times, conversion rates, order accuracy, inventory issues, and store events across all retail categories.
 
 -- COMMAND ----------
 
@@ -26,11 +26,12 @@
 -- MAGIC 
 -- MAGIC | Table | Description | Key Use Cases |
 -- MAGIC |-------|-------------|---------------|
--- MAGIC | `retail_analytics.gold.gold_store_performance_5min` | 5-minute aggregated store metrics | Sales trends, wait time analysis, conversion tracking |
--- MAGIC | `retail_analytics.gold.gold_store_health` | Current store health scores | Store monitoring, health dashboards, alerts |
--- MAGIC | `retail_analytics.gold.gold_store_events` | Parsed transaction events | Incident analysis, inventory monitoring, security |
+-- MAGIC | `retail_analytics.gold.gold_store_performance_5min` | 5-minute aggregated store metrics (all categories) | Sales trends, wait time analysis, conversion tracking |
+-- MAGIC | `retail_analytics.gold.gold_store_health` | Current store health scores (category-aware) | Store monitoring, health dashboards, alerts |
+-- MAGIC | `retail_analytics.gold.gold_store_events` | Parsed transaction events (all categories) | Incident analysis, inventory monitoring, security |
 -- MAGIC | `retail_analytics.gold.gold_metrics_by_region` | Region-aggregated metrics | Geographic performance comparison |
 -- MAGIC | `retail_analytics.gold.gold_kpi_hourly` | Hourly KPI summaries | Executive reporting, trend analysis |
+-- MAGIC | `retail_analytics.gold.gold_drive_through_performance` | Drive-through specific metrics (fast food only) | Drive-through analytics, order accuracy, throughput |
 -- MAGIC 
 -- MAGIC ## Metric Views (Add these to the Genie Space)
 -- MAGIC 
@@ -53,31 +54,66 @@
 -- MAGIC 
 -- MAGIC ## About This Data
 -- MAGIC 
--- MAGIC This Genie space provides access to **Retail Store Performance** data from a retail company's store operations. The data includes:
+-- MAGIC This Genie space provides access to **Retail Store Performance** data from both apparel retail and fast food store operations. The data includes:
 -- MAGIC 
--- MAGIC - **Store metrics**: Operational measurements from stores (sales, wait times, conversion, inventory)
--- MAGIC - **Transaction events**: POS events, payment issues, inventory alerts, security events
--- MAGIC - **Store health**: Real-time health scores and status for all retail locations
+-- MAGIC - **Store metrics**: Operational measurements from all store categories (sales, wait times, conversion, drive-through performance, order accuracy)
+-- MAGIC - **Transaction events**: POS events, payment issues, inventory alerts, security events, drive-through events, food safety alerts
+-- MAGIC - **Store health**: Real-time category-aware health scores and status for all retail locations
+-- MAGIC - **Drive-through analytics**: Fast food specific metrics (throughput, order accuracy, kitchen times, food waste)
+-- MAGIC 
+-- MAGIC **Store Categories:**
+-- MAGIC - **Apparel**: Fashion retail stores with fitting rooms, online pickup (BOPIS), and traditional checkout
+-- MAGIC - **Fast Food**: Quick-service restaurants with drive-through, dine-in, and mobile ordering
 -- MAGIC 
 -- MAGIC ## Key Metrics Explained
+-- MAGIC 
+-- MAGIC ### Common Metrics (All Store Categories)
 -- MAGIC 
 -- MAGIC | Metric | Description | Good Values | Concerning Values |
 -- MAGIC |--------|-------------|-------------|-------------------|
 -- MAGIC | **Hourly Sales ($)** | Revenue per hour | Varies by store | Sudden drops |
 -- MAGIC | **Transactions/Hour** | Number of completed sales | Varies by store | Below average |
+-- MAGIC | **Health Score** | Overall store health (0-100) | > 80 | < 50 |
+-- MAGIC | **Customer Traffic** | Visitors per hour | Varies by store | Sudden drops |
+-- MAGIC 
+-- MAGIC ### Apparel Retail Metrics
+-- MAGIC 
+-- MAGIC | Metric | Description | Good Values | Concerning Values |
+-- MAGIC |--------|-------------|-------------|-------------------|
 -- MAGIC | **Avg Basket Size ($)** | Average transaction value | > $50 | < $20 |
 -- MAGIC | **Checkout Wait Time (sec)** | Customer wait time | < 120 sec | > 300 sec |
 -- MAGIC | **Conversion Rate (%)** | Visitors who purchase | > 25% | < 10% |
 -- MAGIC | **Return Rate (%)** | Product returns | < 5% | > 12% |
--- MAGIC | **Health Score** | Overall store health (0-100) | > 80 | < 50 |
+-- MAGIC | **Fitting Room Usage (%)** | Fitting room utilization | 30-80% | > 85% (capacity) |
+-- MAGIC | **Online Pickup Rate (%)** | BOPIS/Curbside pickup | 10-35% | N/A |
 -- MAGIC 
--- MAGIC ## Store Types
+-- MAGIC ### Fast Food Metrics
 -- MAGIC 
--- MAGIC - **flagship**: Large full-experience stores
--- MAGIC - **mall**: Shopping mall locations
--- MAGIC - **outlet**: Discount outlet stores
--- MAGIC - **express**: Small convenience locations
--- MAGIC - **warehouse**: Large warehouse stores
+-- MAGIC | Metric | Description | Good Values | Concerning Values |
+-- MAGIC |--------|-------------|-------------|-------------------|
+-- MAGIC | **Avg Order Value ($)** | Average order size | > $12 | < $7 |
+-- MAGIC | **Drive-Through Wait Time (sec)** | Order to pickup time | < 200 sec | > 420 sec |
+-- MAGIC | **Drive-Through Throughput (cars/hr)** | Cars served per hour | 40-120 | < 15 |
+-- MAGIC | **Order Accuracy (%)** | Correct orders | > 95% | < 88% |
+-- MAGIC | **Speaker to Window Time (sec)** | Speaker to pickup window | < 180 sec | > 270 sec |
+-- MAGIC | **Kitchen Ticket Time (sec)** | Food preparation time | < 300 sec | > 540 sec |
+-- MAGIC | **Food Waste (%)** | Waste percentage | < 10% | > 20% |
+-- MAGIC | **Mobile Order Pickup Time (sec)** | Mobile order fulfillment | < 120 sec | > 220 sec |
+-- MAGIC 
+-- MAGIC ## Store Categories and Types
+-- MAGIC 
+-- MAGIC ### Apparel Retail Stores
+-- MAGIC - **flagship**: Large full-experience stores with complete product lines
+-- MAGIC - **mall**: Shopping mall locations, standard retail format
+-- MAGIC - **outlet**: Discount outlet stores with clearance merchandise
+-- MAGIC - **express**: Small convenience locations with curated selection
+-- MAGIC 
+-- MAGIC ### Fast Food Stores
+-- MAGIC - **drive_through**: Drive-through focused locations
+-- MAGIC - **dine_in**: Traditional dine-in restaurants
+-- MAGIC - **express_counter**: Quick-service counter locations
+-- MAGIC - **food_court**: Mall food court locations
+-- MAGIC - **flagship_restaurant**: Large flagship restaurant locations
 -- MAGIC 
 -- MAGIC ## Regions
 -- MAGIC 
@@ -85,14 +121,33 @@
 -- MAGIC 
 -- MAGIC ## Event Categories
 -- MAGIC 
+-- MAGIC ### Common Event Categories (All Stores)
+-- MAGIC 
 -- MAGIC | Category | Description |
 -- MAGIC |----------|-------------|
 -- MAGIC | **sales** | Completed transactions |
--- MAGIC | **checkout_issue** | Payment declines, POS errors, timeouts |
+-- MAGIC | **checkout_issue** | Payment declines, POS errors, timeouts, kiosk errors |
 -- MAGIC | **returns** | Product refunds |
 -- MAGIC | **inventory** | Stock alerts, stockouts |
 -- MAGIC | **security** | Theft alerts, suspicious activity |
 -- MAGIC | **loyalty** | Loyalty program events |
+-- MAGIC | **pricing** | Price overrides, pricing issues |
+-- MAGIC 
+-- MAGIC ### Apparel-Specific Categories
+-- MAGIC 
+-- MAGIC | Category | Description |
+-- MAGIC |----------|-------------|
+-- MAGIC | **fitting_room** | Fitting room wait times, usage |
+-- MAGIC | **mobile_order** | BOPIS, curbside pickup, online orders |
+-- MAGIC 
+-- MAGIC ### Fast Food-Specific Categories
+-- MAGIC 
+-- MAGIC | Category | Description |
+-- MAGIC |----------|-------------|
+-- MAGIC | **drive_through** | Drive-through timeouts, delays, order completion |
+-- MAGIC | **kitchen_ops** | Equipment failures, kitchen operations |
+-- MAGIC | **food_safety** | Food safety alerts, temperature issues |
+-- MAGIC | **customer_service** | Wrong orders, complaints |
 -- MAGIC 
 -- MAGIC ## Severity Levels (for Events)
 -- MAGIC 
@@ -185,6 +240,28 @@
 -- MAGIC 26. **"Compare all KPIs between West Coast and East Coast"**
 -- MAGIC 27. **"How many stores are in each region?"**
 -- MAGIC 28. **"Show the top performing region by sales"**
+-- MAGIC 
+-- MAGIC ## Fast Food / Drive-Through Questions
+-- MAGIC 
+-- MAGIC 29. **"What is the average drive-through wait time across all stores?"**
+-- MAGIC 30. **"Which fast food stores have the lowest order accuracy?"**
+-- MAGIC 31. **"Show me stores with drive-through wait times over 5 minutes"**
+-- MAGIC 32. **"What is the average throughput by region for drive-through?"**
+-- MAGIC 33. **"Which stores have the highest food waste percentage?"**
+-- MAGIC 34. **"Compare kitchen ticket times between regions"**
+-- MAGIC 35. **"Show the top 10 performing drive-through stores"**
+-- MAGIC 36. **"What is the average mobile order pickup time?"**
+-- MAGIC 37. **"Which stores have order accuracy below 90%?"**
+-- MAGIC 38. **"Show drive-through performance during lunch peak hours"**
+-- MAGIC 
+-- MAGIC ## Category-Specific Questions
+-- MAGIC 
+-- MAGIC 39. **"Compare apparel stores vs fast food stores by health score"**
+-- MAGIC 40. **"What are the top issues for fast food stores today?"**
+-- MAGIC 41. **"Show fitting room usage for apparel stores by region"**
+-- MAGIC 42. **"Which store category has more critical events?"**
+-- MAGIC 43. **"Compare conversion rates for apparel stores by type"**
+-- MAGIC 44. **"Show all food safety alerts from the last 24 hours"**
 
 -- COMMAND ----------
 
@@ -322,6 +399,38 @@
 -- MAGIC 
 -- MAGIC Use ORDER BY hour_start for time-series analysis.
 -- MAGIC ```
+-- MAGIC 
+-- MAGIC ---
+-- MAGIC 
+-- MAGIC ## gold_drive_through_performance
+-- MAGIC 
+-- MAGIC **Instructions:**
+-- MAGIC ```
+-- MAGIC This table contains drive-through specific metrics for fast food stores only.
+-- MAGIC 
+-- MAGIC Key columns:
+-- MAGIC - window_start, window_end: Time window for aggregation
+-- MAGIC - store_id, store_type, region, brand: Store identification
+-- MAGIC - avg_wait_time_sec, p95_wait_time_sec: Drive-through wait time metrics
+-- MAGIC - avg_throughput_per_hour: Cars served per hour
+-- MAGIC - avg_order_accuracy_pct: Order accuracy percentage
+-- MAGIC - avg_speaker_to_window_sec, p95_speaker_to_window_sec: Speaker to window time
+-- MAGIC - avg_mobile_pickup_sec: Mobile order pickup time
+-- MAGIC - avg_peak_service_time_sec: Peak hour service time
+-- MAGIC - time_period: breakfast_peak, lunch_peak, dinner_peak, off_peak
+-- MAGIC - performance_grade: Excellent, Good, Fair, Needs_Improvement
+-- MAGIC 
+-- MAGIC Use this table for:
+-- MAGIC - Drive-through performance analysis
+-- MAGIC - Order accuracy tracking
+-- MAGIC - Throughput optimization
+-- MAGIC - Peak vs off-peak comparisons
+-- MAGIC - Performance grading and benchmarking
+-- MAGIC 
+-- MAGIC Filter by time_period for peak hour analysis.
+-- MAGIC Filter by performance_grade to find underperforming stores.
+-- MAGIC This table only contains data for store_category = 'fast_food'.
+-- MAGIC ```
 
 -- COMMAND ----------
 
@@ -430,6 +539,7 @@
 -- MAGIC - `retail_analytics.gold.gold_store_events`
 -- MAGIC - `retail_analytics.gold.gold_metrics_by_region`
 -- MAGIC - `retail_analytics.gold.gold_kpi_hourly`
+-- MAGIC - `retail_analytics.gold.gold_drive_through_performance`
 -- MAGIC 
 -- MAGIC **Metric Views:**
 -- MAGIC - `retail_analytics.metrics.mv_store_performance`

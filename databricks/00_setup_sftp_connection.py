@@ -103,6 +103,8 @@ for schema, description in schemas.items():
 # MAGIC ## Step 3: Create Unity Catalog SFTP Connection
 # MAGIC 
 # MAGIC This creates a connection using password-based authentication as specified in the requirements.
+# MAGIC 
+# MAGIC Note: Setting `enforce_host_key_fingerprint false` disables host key fingerprint validation.
 
 # COMMAND ----------
 
@@ -116,6 +118,7 @@ except Exception as e:
 # COMMAND ----------
 
 # Create the SFTP connection using password authentication
+# Note: enforce_host_key_fingerprint false disables host key validation
 create_connection_sql = f"""
 CREATE CONNECTION {CONNECTION_NAME}
 TYPE sftp
@@ -123,7 +126,8 @@ OPTIONS (
   host '{SFTP_HOST}',
   user '{SFTP_USERNAME}',
   password '{SFTP_PASSWORD}',
-  port '{SFTP_PORT}'
+  port '{SFTP_PORT}',
+  enforce_host_key_fingerprint false
 )
 COMMENT 'SFTP connection for Telco network telemetry data ingestion'
 """

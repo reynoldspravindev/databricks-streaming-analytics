@@ -7,8 +7,8 @@ Wants=network-online.target
 Type=simple
 User=telco_user
 Group=sftpusers
-WorkingDirectory=/opt/telco-generator
-Environment="PATH=/opt/telco-generator/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+WorkingDirectory=/opt/retail-generator
+Environment="PATH=/opt/retail-generator/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
 # GCS bucket for metrics data - UPDATE THIS WITH YOUR BUCKET NAME
 Environment="GCS_RETAIL_BUCKET=gs://gcp-sandbox-field-eng-telco-snmp/metrics/"
@@ -16,7 +16,7 @@ Environment="GCS_RETAIL_BUCKET=gs://gcp-sandbox-field-eng-telco-snmp/metrics/"
 # Run the retail data generator:
 # - Events go to local SFTP directory
 # - Metrics go to GCS bucket (JSON format)
-ExecStart=/opt/telco-generator/venv/bin/python3 /opt/telco-generator/retail_data_generator.py \
+ExecStart=/opt/retail-generator/venv/bin/python3 /opt/retail-generator/retail_data_generator.py \
     --events-dir /sftp/retail/events \
     --metrics-gcs-bucket ${GCS_RETAIL_BUCKET} \
     --files-per-minute 500 \
