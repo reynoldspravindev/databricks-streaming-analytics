@@ -8,7 +8,7 @@ This demo supports multiple industry use cases. Choose the one that best fits yo
 
 | Flavor | Description | Data Generator | Notebooks |
 |--------|-------------|----------------|-----------|
-| **Telco Network Performance** | Monitor network devices, latency, packet loss, throughput | `telco_data_generator.py` | `databricks/*.py/sql` |
+| **Telco Network Performance** | Monitor network devices, latency, packet loss, throughput | `telco_data_generator.py` | `databricks/telco/*.py/sql` |
 | **Retail Store Performance** | Track store metrics for fast food chains (with drive-through) and apparel retail | `retail_data_generator.py` | `databricks/retail/*.py/sql` |
 
 ## Demo Objectives
@@ -42,18 +42,19 @@ GCPNetworkPerfETLDemo/
 │   ├── ims_data_generator.py     # Cross-cloud IMS data
 │   └── schema_evolution_demo.py  # Schema evolution demo script
 │
-├── databricks/                              # Telco Databricks notebooks
-│   ├── 00_setup_sftp_connection.py          # Unity Catalog SFTP connection
-│   ├── 01_1_bronze_ingestion_syslog.py      # Syslog Auto Loader from SFTP
-│   ├── 01_2_bronze_ingestion_snmp.py        # SNMP Auto Loader from GCS
-│   ├── 01_3_bronze_monitor.py               # Bronze layer monitoring
-│   ├── 02_silver_pipeline.sql               # Lakeflow DLT Silver
-│   ├── 03_gold_pipeline.sql                 # Lakeflow DLT Gold
-│   ├── 04_metric_views.sql                  # Unity Catalog metric views
-│   ├── 05_genie_space_setup.sql             # Genie AI assistant setup
-│   ├── 06_ims_cross_cloud_analytics.sql     # Cross-cloud analytics
-│   ├── aws/                                 # AWS cross-cloud notebooks
+├── databricks/                              # Databricks notebooks by industry
+│   ├── telco/                               # Telco network performance notebooks
+│   │   ├── 00_setup_sftp_connection.py      # Unity Catalog SFTP connection
+│   │   ├── 01_1_bronze_ingestion_syslog.py  # Syslog Auto Loader from SFTP
+│   │   ├── 01_2_bronze_ingestion_snmp.py    # SNMP Auto Loader from GCS
+│   │   ├── 01_3_bronze_monitor.py           # Bronze layer monitoring
+│   │   ├── 02_silver_pipeline.sql           # Lakeflow DLT Silver
+│   │   ├── 03_gold_pipeline.sql             # Lakeflow DLT Gold
+│   │   ├── 04_metric_views.sql              # Unity Catalog metric views
+│   │   ├── 05_genie_space_setup.sql         # Genie AI assistant setup
+│   │   └── 06_ims_cross_cloud_analytics.sql # Cross-cloud analytics
 │   ├── retail/                              # Retail industry notebooks
+│   ├── aws/                                 # AWS cross-cloud notebooks
 │   └── archived/                            # Reference implementations
 │
 ├── docs/                     # Documentation
@@ -308,13 +309,13 @@ Configure secrets in Databricks for SFTP connection:
 #### 3.2: Run Notebooks in Order
 
 **For Telco flavor:**
-1. `00_setup_sftp_connection.py`: Creates Unity Catalog connection and schemas
-2. `01_1_bronze_ingestion_syslog.py`: Starts syslog Auto Loader
-3. `01_2_bronze_ingestion_snmp.py`: Starts SNMP Auto Loader
-4. `01_3_bronze_monitor.py`: Monitor ingestion progress
-5. `02_silver_pipeline.sql`: Create DLT pipeline for silver layer
-6. `03_gold_pipeline.sql`: Create DLT pipeline for gold layer
-7. `04_metric_views.sql`: Create Unity Catalog metric views
+1. `telco/00_setup_sftp_connection.py`: Creates Unity Catalog connection and schemas
+2. `telco/01_1_bronze_ingestion_syslog.py`: Starts syslog Auto Loader
+3. `telco/01_2_bronze_ingestion_snmp.py`: Starts SNMP Auto Loader
+4. `telco/01_3_bronze_monitor.py`: Monitor ingestion progress
+5. `telco/02_silver_pipeline.sql`: Create DLT pipeline for silver layer
+6. `telco/03_gold_pipeline.sql`: Create DLT pipeline for gold layer
+7. `telco/04_metric_views.sql`: Create Unity Catalog metric views
 
 **For Retail flavor:**
 1. `retail/00_setup_retail_connection.py`: Creates Unity Catalog connection
@@ -329,21 +330,21 @@ Configure secrets in Databricks for SFTP connection:
 **Silver Pipeline:**
 1. Go to Workflows → Delta Live Tables → Create Pipeline
 2. Pipeline Name: `<flavor>_silver_pipeline`
-3. Notebook: `databricks/02_silver_pipeline.sql` (or retail variant)
+3. Notebook: `databricks/telco/02_silver_pipeline.sql` (or `databricks/retail/02_silver_pipeline_retail.sql`)
 4. Target: `<catalog>.<schema>.silver`
 5. Enable: Auto Scaling, Schema Evolution
 6. Start Pipeline
 
 **Gold Pipeline:**
 1. Create Pipeline: `<flavor>_gold_pipeline`
-2. Notebook: `databricks/03_gold_pipeline.sql` (or retail variant)
+2. Notebook: `databricks/telco/03_gold_pipeline.sql` (or `databricks/retail/03_gold_pipeline_retail.sql`)
 3. Target: `<catalog>.<schema>.gold`
 4. Enable: Auto Scaling
 5. Start Pipeline
 
 ### Step 4: Monitor and Visualize
 
-1. Run `04_metric_views.sql` to create metric views
+1. Run `telco/04_metric_views.sql` (or `retail/04_metric_views_retail.sql`) to create metric views
 2. Create Databricks SQL Dashboard using the metric views
 3. Monitor Unity Catalog lineage
 4. Check data quality metrics
@@ -424,7 +425,9 @@ df = (spark.readStream
 
 ### Retail Store Performance KPIs
 
-The retail generator supports two categories with category-specific metrics:
+The retail generator supports two categories with category-specific metrics.
+
+**Geospatial Support**: All 2000 stores include realistic latitude/longitude coordinates for map-based visualizations, proximity analysis, and spatial clustering. See [Geospatial Features](docs/geospatial_features.md) for details.
 
 #### Apparel Retail
 
@@ -453,6 +456,7 @@ The retail generator supports two categories with category-specific metrics:
 
 - [Architecture Details](docs/architecture.md)
 - [Data Generator Control Guide](docs/data_generator_control.md)
+- [Geospatial Features](docs/geospatial_features.md) - Store location mapping and spatial analysis
 - [Performance Metrics](docs/performance_metrics.md)
 
 ## Configuration

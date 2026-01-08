@@ -19,7 +19,8 @@ Environment="GCS_RETAIL_BUCKET=gs://gcp-sandbox-field-eng-telco-snmp/metrics/"
 ExecStart=/opt/retail-generator/venv/bin/python3 /opt/retail-generator/retail_data_generator.py \
     --events-dir /sftp/retail/events \
     --metrics-gcs-bucket ${GCS_RETAIL_BUCKET} \
-    --files-per-minute 500 \
+    --files-per-minute 1000 \
+    --fast-food-ratio 0.5 \
     --log-level INFO
 
 # Restart policy

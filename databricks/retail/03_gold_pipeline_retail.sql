@@ -38,6 +38,8 @@ AS SELECT
   region,
   brand,
   district,
+  FIRST(latitude) AS latitude,
+  FIRST(longitude) AS longitude,
   metric_name,
   metric_unit,
   
@@ -136,6 +138,8 @@ AS SELECT DISTINCT
   brand,
   district,
   address,
+  FIRST(latitude) AS latitude,
+  FIRST(longitude) AS longitude,
   
   -- Generate store key for cross-cloud joins
   CONCAT(store_id, '_', region) AS store_key,
@@ -227,6 +231,8 @@ AS SELECT
   store_type,
   region,
   brand,
+  FIRST(latitude) AS latitude,
+  FIRST(longitude) AS longitude,
   
   -- Drive-through specific metrics
   MAX(CASE WHEN metric_name = 'drive_through_wait_time_sec' THEN avg_value END) AS avg_wait_time_sec,
@@ -348,6 +354,8 @@ WITH latest_metrics AS (
     store_type,
     region,
     brand,
+    latitude,
+    longitude,
     metric_name,
     avg_value,
     window_end,
@@ -360,6 +368,8 @@ pivoted AS (
     store_category,
     store_type,
     region,
+    FIRST(latitude) AS latitude,
+    FIRST(longitude) AS longitude,
     -- Common metrics
     MAX(CASE WHEN metric_name = 'hourly_sales' THEN avg_value END) AS current_hourly_sales,
     MAX(CASE WHEN metric_name = 'transactions_per_hour' THEN avg_value END) AS current_transactions,
@@ -400,6 +410,8 @@ SELECT
   p.store_category,
   p.store_type,
   p.region,
+  p.latitude,
+  p.longitude,
   -- Common metrics
   COALESCE(p.current_hourly_sales, 0) AS current_hourly_sales,
   COALESCE(p.current_transactions, 0) AS current_transactions,

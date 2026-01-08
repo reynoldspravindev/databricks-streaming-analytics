@@ -144,6 +144,8 @@ AS SELECT
   brand,
   district,
   address,
+  CAST(latitude AS DOUBLE) AS latitude,
+  CAST(longitude AS DOUBLE) AS longitude,
   oid,
   metric_name,
   CAST(value AS DOUBLE) AS value,

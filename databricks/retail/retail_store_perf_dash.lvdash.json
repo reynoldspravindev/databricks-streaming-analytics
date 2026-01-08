@@ -1,157 +1,720 @@
 {
+  "version": "1.0",
+  "parameters": [
+    {
+      "name": "param_date_start",
+      "displayName": "Start Date",
+      "dataType": "DATE",
+      "defaultValue": {
+        "type": "relative",
+        "value": "now-7d/d"
+      }
+    },
+    {
+      "name": "param_date_end",
+      "displayName": "End Date",
+      "dataType": "DATE",
+      "defaultValue": {
+        "type": "relative",
+        "value": "now/d"
+      }
+    }
+  ],
   "datasets": [
     {
+      "name": "ds_filter_regions",
+      "displayName": "Available Regions for Filter",
+      "queryLines": [
+        "SELECT DISTINCT `Region` as region\n",
+        "FROM retail_analytics.metrics.mv_store_health\n",
+        "WHERE `Store Category` = 'fast_food'\n",
+        "ORDER BY region"
+      ]
+    },
+    {
+      "name": "ds_filter_brands",
+      "displayName": "Available Brands for Filter",
+      "queryLines": [
+        "SELECT DISTINCT `Store Type` as brand\n",
+        "FROM retail_analytics.metrics.mv_store_health\n",
+        "WHERE `Store Category` = 'fast_food'\n",
+        "ORDER BY brand"
+      ]
+    },
+    {
+      "name": "ds_date_range",
+      "displayName": "Available Date Range",
+      "queryLines": [
+        "SELECT\n",
+        "  DATE_SUB(CURRENT_DATE(), 30) as min_date,\n",
+        "  CURRENT_DATE() as max_date"
+      ]
+    },
+    {
       "name": "ds_store_count",
-      "displayName": "Total Store Count",
+      "displayName": "Total QSR Locations",
       "queryLines": [
-        "SELECT COUNT(DISTINCT store_id) as total_stores FROM retail_analytics.gold.gold_store_health"
+        "SELECT MEASURE(`Store Count`) as total_stores\n",
+        "FROM retail_analytics.metrics.mv_store_health\n",
+        "WHERE `Store Category` = 'fast_food'"
       ]
     },
     {
-      "name": "ds_critical_count",
-      "displayName": "Critical Store Count",
+      "name": "ds_at_risk_stores",
+      "displayName": "At-Risk Locations (Churn Indicators)",
       "queryLines": [
-        "SELECT COUNT(*) as critical_stores FROM retail_analytics.gold.gold_store_health WHERE health_status IN ('Critical', 'Poor') OR requires_attention = true"
+        "SELECT MEASURE(`Stores Needing Attention`) + MEASURE(`Critical Store Count`) as at_risk_stores\n",
+        "FROM retail_analytics.metrics.mv_store_health\n",
+        "WHERE `Store Category` = 'fast_food'"
       ]
     },
     {
-      "name": "ds_avg_health",
-      "displayName": "Average Health Score",
+      "name": "ds_customer_satisfaction",
+      "displayName": "Customer Satisfaction Score",
       "queryLines": [
-        "SELECT ROUND(AVG(health_score), 1) as avg_health_score FROM retail_analytics.gold.gold_store_health"
+        "SELECT ROUND(MEASURE(`Average Health Score`), 1) as avg_csat\n",
+        "FROM retail_analytics.metrics.mv_store_health\n",
+        "WHERE `Store Category` = 'fast_food'"
       ]
     },
     {
-      "name": "ds_total_sales",
-      "displayName": "Total Sales",
+      "name": "ds_avg_speed_of_service",
+      "displayName": "Average Speed of Service Across Channels",
       "queryLines": [
-        "SELECT ROUND(SUM(avg_value), 0) as total_sales FROM retail_analytics.gold.gold_store_performance_5min WHERE metric_name = 'hourly_sales' AND window_start >= current_timestamp() - INTERVAL 24 HOURS"
+        "SELECT  ROUND(MEASURE(`Average Value`), 1) AS avg_value,  `Metric Name`\n",
+        "FROM retail_analytics.metrics.mv_store_performance\n",
+        "WHERE `Time Window Start` >= TO_DATE(:param_date_start)  \n",
+        "AND `Time Window Start` <= TO_DATE(:param_date_end)  \n",
+        "AND `Store Category` = 'fast_food'  \n",
+        "AND `Metric Name` IN ('checkout_wait_time_sec', 'drive_through_wait_time_sec', 'mobile_pickup_wait_time_sec')\n",
+        "GROUP BY `Metric Name`"
+      ],
+      "parameters": [
+        {
+          "displayName": "param_date_start",
+          "keyword": "param_date_start",
+          "dataType": "DATE",
+          "defaultSelection": {
+            "values": {
+              "dataType": "DATE",
+              "values": [
+                {
+                  "value": "now-14d/d"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "displayName": "param_date_end",
+          "keyword": "param_date_end",
+          "dataType": "DATE",
+          "defaultSelection": {
+            "values": {
+              "dataType": "DATE",
+              "values": [
+                {
+                  "value": "now/d"
+                }
+              ]
+            }
+          }
+        }
       ]
     },
     {
-      "name": "ds_health_distribution",
-      "displayName": "Health Status Distribution",
+      "name": "ds_churn_risk_analysis",
+      "displayName": "Customer Churn Risk Indicators",
       "queryLines": [
-        "SELECT health_status, COUNT(*) as count FROM retail_analytics.gold.gold_store_health GROUP BY health_status ORDER BY count DESC"
+        "SELECT  `Store ID` as store_id,  `Region` as region,  `Store Type` as brand,  MEASURE(`Average Health Score`) as health_score,  ROUND(MEASURE(`Avg Wait Time (sec)`), 1) as wait_time_sec,  ROUND(MEASURE(`Avg Return Rate`), 2) as return_rate_pct,  MEASURE(`Critical Events (1h)`) as critical_event_count_1h,  CASE    WHEN MEASURE(`Average Health Score`) < 50 AND MEASURE(`Avg Wait Time (sec)`) > 300 THEN 'Critical Risk'    WHEN MEASURE(`Average Health Score`) < 60 OR MEASURE(`Avg Wait Time (sec)`) > 240 OR MEASURE(`Critical Events (1h)`) > 3 THEN 'High Risk'    WHEN MEASURE(`Average Health Score`) < 70 OR MEASURE(`Avg Wait Time (sec)`) > 180 THEN 'Medium Risk'    ELSE 'Low Risk'  END as churn_risk_level,  CASE    WHEN MEASURE(`Average Health Score`) < 50 AND MEASURE(`Avg Wait Time (sec)`) > 300 THEN 90    WHEN MEASURE(`Average Health Score`) < 60 OR MEASURE(`Avg Wait Time (sec)`) > 240 OR MEASURE(`Critical Events (1h)`) > 3 THEN 70    WHEN MEASURE(`Average Health Score`) < 70 OR MEASURE(`Avg Wait Time (sec)`) > 180 THEN 40    ELSE 10  END as churn_probability_pct\n",
+        "FROM retail_analytics.metrics.mv_store_health\n",
+        "WHERE `Store Category` = 'fast_food'\n",
+        "GROUP BY `Store ID`, `Region`, `Store Type`\n",
+        "ORDER BY churn_probability_pct DESC"
       ]
     },
     {
-      "name": "ds_store_types",
-      "displayName": "Store Type Count",
+      "name": "ds_channel_performance",
+      "displayName": "Multi-Channel Service Performance",
       "queryLines": [
-        "SELECT store_type, COUNT(*) as count FROM retail_analytics.gold.gold_store_health GROUP BY store_type ORDER BY count DESC"
+        "SELECT  `Time Window Start` as window_start,  \n",
+        "`Region` as region,  \n",
+        "`Metric Name` as service_channel,  \n",
+        "ROUND(MEASURE(`Average Value`), 1) as avg_wait_time,  \n",
+        "CASE    WHEN `Metric Name` = 'drive_through_wait_time_sec' THEN 'Drive-Through'    \n",
+        "        WHEN `Metric Name` = 'checkout_wait_time_sec' THEN 'In-Store'    \n",
+        "        WHEN `Metric Name` = 'mobile_pickup_wait_time_sec' THEN 'Mobile Pickup'    \n",
+        "        ELSE `Metric Name`  END as channel_display_name\n",
+        "FROM retail_analytics.metrics.mv_store_performance\n",
+        "WHERE `Time Window Start` >= TO_DATE(:param_date_start)  AND `Time Window Start` <= TO_DATE(:param_date_end)  AND `Store Category` = 'fast_food'  AND `Metric Name` IN ('drive_through_wait_time_sec', 'checkout_wait_time_sec', 'mobile_pickup_wait_time_sec')\n",
+        "GROUP BY `Time Window Start`, `Region`, `Metric Name`\n",
+        "ORDER BY window_start"
+      ],
+      "parameters": [
+        {
+          "displayName": "param_date_start",
+          "keyword": "param_date_start",
+          "dataType": "DATE",
+          "defaultSelection": {
+            "values": {
+              "dataType": "DATE",
+              "values": [
+                {
+                  "value": "now-14d/d"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "displayName": "param_date_end",
+          "keyword": "param_date_end",
+          "dataType": "DATE",
+          "defaultSelection": {
+            "values": {
+              "dataType": "DATE",
+              "values": [
+                {
+                  "value": "now/d"
+                }
+              ]
+            }
+          }
+        }
       ]
     },
     {
-      "name": "ds_category_breakdown",
-      "displayName": "Store Category Breakdown",
+      "name": "ds_regional_performance_geo",
+      "displayName": "Regional Performance for Geospatial View",
       "queryLines": [
-        "SELECT store_category, COUNT(*) as count, ROUND(AVG(health_score), 1) as avg_health FROM retail_analytics.gold.gold_store_health GROUP BY store_category ORDER BY count DESC"
+        "SELECT\n",
+        "  `Region` as region,\n",
+        "  MEASURE(`Store Count`) as store_count,\n",
+        "  ROUND(MEASURE(`Average Health Score`), 1) as avg_health,\n",
+        "  ROUND(MEASURE(`Avg Wait Time (sec)`), 1) as avg_wait_time,\n",
+        "  MEASURE(`Critical Events (1h)`) as critical_events,\n",
+        "  ROUND(MEASURE(`Avg Hourly Sales`), 0) as avg_sales,\n",
+        "  AVG(`Latitude`) as latitude,\n",
+        "  AVG(`Longitude`) as longitude\n",
+        "FROM retail_analytics.metrics.mv_store_health\n",
+        "WHERE `Store Category` = 'fast_food'\n",
+        "GROUP BY `Region`"
       ]
     },
     {
-      "name": "ds_region_summary",
-      "displayName": "Region Summary",
+      "name": "ds_store_locations_geospatial",
+      "displayName": "Store-Level Geospatial Performance Map",
       "queryLines": [
-        "SELECT region, COUNT(*) as stores, COUNT(CASE WHEN store_category = 'apparel' THEN 1 END) as apparel_stores, COUNT(CASE WHEN store_category = 'fast_food' THEN 1 END) as fast_food_stores, ROUND(AVG(health_score), 1) as avg_health, ROUND(AVG(current_hourly_sales), 2) as avg_sales, SUM(critical_event_count_1h) as critical_events FROM retail_analytics.gold.gold_store_health GROUP BY region ORDER BY avg_health ASC"
+        "SELECT\n",
+        "  `Store ID` as store_id,\n",
+        "  `Latitude` as latitude,\n",
+        "  `Longitude` as longitude,\n",
+        "  `Region` as region,\n",
+        "  `Store Type` as brand,\n",
+        "  ROUND(MEASURE(`Average Health Score`), 1) as health_score,\n",
+        "  ROUND(MEASURE(`Avg Wait Time (sec)`), 1) as wait_time_sec,\n",
+        "  MEASURE(`Critical Events (1h)`) as critical_events,\n",
+        "  `Health Status` as health_status\n",
+        "FROM retail_analytics.metrics.mv_store_health\n",
+        "WHERE `Store Category` = 'fast_food'\n",
+        "  AND `Latitude` IS NOT NULL\n",
+        "  AND `Longitude` IS NOT NULL\n",
+        "GROUP BY `Store ID`, `Latitude`, `Longitude`, `Region`, `Store Type`, `Health Status`"
+      ]
+    },
+    {
+      "name": "ds_hme_performance_map",
+      "displayName": "HME Drive-Thru Performance Heat Map",
+      "queryLines": [
+        "SELECT\n",
+        "  `Store ID` as store_id,\n",
+        "  `Latitude` as latitude,\n",
+        "  `Longitude` as longitude,\n",
+        "  `Region` as region,\n",
+        "  `Brand` as brand,\n",
+        "  ROUND(AVG(CASE WHEN `Metric Name` = 'drive_through_total_experience_time_sec' THEN MEASURE(`Average Value`) END), 1) as avg_otd_sec,\n",
+        "  ROUND(AVG(CASE WHEN `Metric Name` = 'drive_through_cars_per_hour' THEN MEASURE(`Average Value`) END), 1) as avg_throughput,\n",
+        "  COUNT(DISTINCT `Time Window Start`) as sample_count\n",
+        "FROM retail_analytics.metrics.mv_hme_speed_of_service\n",
+        "WHERE `Time Window Start` >= DATE_SUB(CURRENT_DATE(), 7)\n",
+        "  AND `Latitude` IS NOT NULL\n",
+        "  AND `Longitude` IS NOT NULL\n",
+        "GROUP BY `Store ID`, `Latitude`, `Longitude`, `Region`, `Brand`\n",
+        "HAVING sample_count >= 5"
+      ]
+    },
+    {
+      "name": "ds_hme_kpis_summary",
+      "displayName": "HME Speed of Service KPIs Summary",
+      "queryLines": [
+        "SELECT\n",
+        "  `Metric Name` as metric_name,\n",
+        "  ROUND(MEASURE(`Average Value`), 1) as avg_value,\n",
+        "  ROUND(MEASURE(`P95 Value`), 1) as p95_value,\n",
+        "  `Sensor Type` as sensor_type,\n",
+        "  CASE\n",
+        "    WHEN `Metric Name` = 'drive_through_total_experience_time_sec' THEN 'Total Experience (OTD)'\n",
+        "    WHEN `Metric Name` = 'drive_through_menu_board_time_sec' THEN 'Menu Board Time'\n",
+        "    WHEN `Metric Name` = 'drive_through_window_time_sec' THEN 'Window Time'\n",
+        "    WHEN `Metric Name` = 'drive_through_kds_bump_time_sec' THEN 'KDS Bump Time'\n",
+        "    WHEN `Metric Name` = 'drive_through_cars_per_hour' THEN 'Throughput (Cars/Hr)'\n",
+        "    ELSE `Metric Name`\n",
+        "  END as display_name\n",
+        "FROM retail_analytics.metrics.mv_hme_speed_of_service\n",
+        "WHERE `Time Window Start` >= DATE_SUB(CURRENT_DATE(), 7)\n",
+        "  AND `Metric Name` IN (\n",
+        "    'drive_through_total_experience_time_sec',\n",
+        "    'drive_through_menu_board_time_sec',\n",
+        "    'drive_through_window_time_sec',\n",
+        "    'drive_through_kds_bump_time_sec',\n",
+        "    'drive_through_cars_per_hour'\n",
+        "  )\n",
+        "GROUP BY `Metric Name`, `Sensor Type`"
+      ]
+    },
+    {
+      "name": "ds_hme_breakdown_by_region",
+      "displayName": "HME KPI Breakdown by Region",
+      "queryLines": [
+        "SELECT\n",
+        "  `Region` as region,\n",
+        "  `Metric Name` as metric_name,\n",
+        "  ROUND(MEASURE(`Average Value`), 1) as avg_value,\n",
+        "  CASE\n",
+        "    WHEN `Metric Name` = 'drive_through_total_experience_time_sec' THEN 'Total Experience'\n",
+        "    WHEN `Metric Name` = 'drive_through_menu_board_time_sec' THEN 'Menu Board'\n",
+        "    WHEN `Metric Name` = 'drive_through_window_time_sec' THEN 'Window'\n",
+        "    WHEN `Metric Name` = 'drive_through_kds_bump_time_sec' THEN 'KDS Bump'\n",
+        "    WHEN `Metric Name` = 'drive_through_cars_per_hour' THEN 'Throughput'\n",
+        "    ELSE `Metric Name`\n",
+        "  END as display_name\n",
+        "FROM retail_analytics.metrics.mv_hme_speed_of_service\n",
+        "WHERE `Time Window Start` >= DATE_SUB(CURRENT_DATE(), 7)\n",
+        "  AND `Metric Name` IN (\n",
+        "    'drive_through_total_experience_time_sec',\n",
+        "    'drive_through_menu_board_time_sec',\n",
+        "    'drive_through_window_time_sec',\n",
+        "    'drive_through_kds_bump_time_sec'\n",
+        "  )\n",
+        "GROUP BY `Region`, `Metric Name`"
+      ]
+    },
+    {
+      "name": "ds_dt_performance_realtime",
+      "displayName": "Drive-Through Real-Time Performance",
+      "queryLines": [
+        "SELECT  `Time Window Start` as window_start,  `Region` as region,  `Brand` as brand,  ROUND(MEASURE(`Avg Wait Time (sec)`), 1) as avg_wait,  ROUND(MEASURE(`Avg Order Accuracy`), 1) as avg_accuracy,  ROUND(MEASURE(`Avg Throughput`), 1) as throughput,  ROUND(MEASURE(`Avg Speaker to Window Time`), 1) as speaker_to_window_time \n",
+        "FROM retail_analytics.metrics.mv_drive_through_performance\n",
+        "WHERE `Time Window Start` >= TO_DATE(:param_date_start)  AND `Time Window Start` <= TO_DATE(:param_date_end)\n",
+        "GROUP BY `Time Window Start`, `Region`, `Brand`\n",
+        "ORDER BY window_start DESC"
+      ],
+      "parameters": [
+        {
+          "displayName": "param_date_start",
+          "keyword": "param_date_start",
+          "dataType": "DATE",
+          "defaultSelection": {
+            "values": {
+              "dataType": "DATE",
+              "values": [
+                {
+                  "value": "now-14d/d"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "displayName": "param_date_end",
+          "keyword": "param_date_end",
+          "dataType": "DATE",
+          "defaultSelection": {
+            "values": {
+              "dataType": "DATE",
+              "values": [
+                {
+                  "value": "now/d"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "ds_peak_hours_analysis",
+      "displayName": "Peak Hours Traffic Analysis",
+      "queryLines": [
+        "SELECT  HOUR(`Time Window Start`) as hour,  `Region` as region,  ROUND(MEASURE(`Average Value`), 1) as avg_wait,  MEASURE(`Total Samples`) as transaction_count,  CASE    WHEN HOUR(`Time Window Start`) BETWEEN 6 AND 10 THEN 'Breakfast'    WHEN HOUR(`Time Window Start`) BETWEEN 11 AND 14 THEN 'Lunch'    WHEN HOUR(`Time Window Start`) BETWEEN 17 AND 21 THEN 'Dinner'    ELSE 'Off-Peak'  END as day_part\n",
+        "FROM retail_analytics.metrics.mv_store_performance\n",
+        "WHERE `Metric Name` = 'drive_through_wait_time_sec'  AND `Time Window Start` >= TO_DATE(:param_date_start)  AND `Time Window Start` <= TO_DATE(:param_date_end)  AND `Store Category` = 'fast_food'\n",
+        "GROUP BY HOUR(`Time Window Start`), `Region`\n",
+        "ORDER BY hour"
+      ],
+      "parameters": [
+        {
+          "displayName": "param_date_start",
+          "keyword": "param_date_start",
+          "dataType": "DATE",
+          "defaultSelection": {
+            "values": {
+              "dataType": "DATE",
+              "values": [
+                {
+                  "value": "now-28d/d"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "displayName": "param_date_end",
+          "keyword": "param_date_end",
+          "dataType": "DATE",
+          "defaultSelection": {
+            "values": {
+              "dataType": "DATE",
+              "values": [
+                {
+                  "value": "now/d"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "ds_service_channel_comparison",
+      "displayName": "Service Channel Performance Comparison",
+      "queryLines": [
+        "SELECT  `Store ID` as store_id,  `Region` as region,  \n",
+        "MAX(CASE WHEN `Metric Name` = 'checkout_wait_time_sec' THEN MEASURE(`Average Value`) END) as instore_wait,  \n",
+        "MAX(CASE WHEN `Metric Name` = 'drive_through_wait_time_sec' THEN MEASURE(`Average Value`) END) as dt_wait,  \n",
+        "MAX(CASE WHEN `Metric Name` = 'mobile_pickup_wait_time_sec' THEN MEASURE(`Average Value`) END) as mobile_wait\n",
+        "FROM retail_analytics.metrics.mv_store_performance\n",
+        "WHERE `Time Window Start` >= TO_DATE(:param_date_start)  \n",
+        "AND `Time Window Start` <= TO_DATE(:param_date_end)  \n",
+        "AND `Store Category` = 'fast_food'  \n",
+        "AND `Metric Name` IN ('checkout_wait_time_sec', 'drive_through_wait_time_sec', 'mobile_pickup_wait_time_sec')\n",
+        "GROUP BY `Store ID`, `Region`"
+      ],
+      "parameters": [
+        {
+          "displayName": "param_date_start",
+          "keyword": "param_date_start",
+          "dataType": "DATE",
+          "defaultSelection": {
+            "values": {
+              "dataType": "DATE",
+              "values": [
+                {
+                  "value": "now-28d/d"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "displayName": "param_date_end",
+          "keyword": "param_date_end",
+          "dataType": "DATE",
+          "defaultSelection": {
+            "values": {
+              "dataType": "DATE",
+              "values": [
+                {
+                  "value": "now/d"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "ds_order_accuracy_trend",
+      "displayName": "Order Accuracy Trend by Channel",
+      "queryLines": [
+        "SELECT  `Time Window Start` as window_start,  `Region` as region,  `Brand` as brand,  ROUND(MEASURE(`Avg Order Accuracy`), 2) as accuracy_pct\n",
+        "FROM retail_analytics.metrics.mv_drive_through_performance\n",
+        "WHERE `Time Window Start` >= TO_DATE(:param_date_start)  AND `Time Window Start` <= TO_DATE(:param_date_end)\n",
+        "GROUP BY `Time Window Start`, `Region`, `Brand`\n",
+        "ORDER BY window_start"
+      ],
+      "parameters": [
+        {
+          "displayName": "param_date_start",
+          "keyword": "param_date_start",
+          "dataType": "DATE",
+          "defaultSelection": {
+            "values": {
+              "dataType": "DATE",
+              "values": [
+                {
+                  "value": "now-28d/d"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "displayName": "param_date_end",
+          "keyword": "param_date_end",
+          "dataType": "DATE",
+          "defaultSelection": {
+            "values": {
+              "dataType": "DATE",
+              "values": [
+                {
+                  "value": "now/d"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "ds_throughput_by_brand",
+      "displayName": "Throughput Analysis by Brand",
+      "queryLines": [
+        "SELECT  `Time Window Start` as window_start,  `Region` as region,  `Brand` as brand,  ROUND(MEASURE(`Avg Throughput`), 1) as cars_per_hour\n",
+        "FROM retail_analytics.metrics.mv_drive_through_performance\n",
+        "WHERE `Time Window Start` >= TO_DATE(:param_date_start)  AND `Time Window Start` <= TO_DATE(:param_date_end)\n",
+        "GROUP BY `Time Window Start`, `Region`, `Brand`\n",
+        "ORDER BY window_start"
+      ],
+      "parameters": [
+        {
+          "displayName": "param_date_start",
+          "keyword": "param_date_start",
+          "dataType": "DATE",
+          "defaultSelection": {
+            "values": {
+              "dataType": "DATE",
+              "values": [
+                {
+                  "value": "now-28d/d"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "displayName": "param_date_end",
+          "keyword": "param_date_end",
+          "dataType": "DATE",
+          "defaultSelection": {
+            "values": {
+              "dataType": "DATE",
+              "values": [
+                {
+                  "value": "now/d"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "ds_performance_grade_dist",
+      "displayName": "Performance Grade Distribution",
+      "queryLines": [
+        "SELECT  `Performance Grade` as performance_grade,  MEASURE(`Store Count`) as store_count,  ROUND(MEASURE(`Avg Wait Time (sec)`), 1) as avg_wait\n",
+        "FROM retail_analytics.metrics.mv_drive_through_performance\n",
+        "WHERE `Time Window Start` >= TO_DATE(:param_date_start)  AND `Time Window Start` <= TO_DATE(:param_date_end)\n",
+        "GROUP BY `Performance Grade`\n",
+        "ORDER BY CASE performance_grade  WHEN 'Excellent' THEN 1  WHEN 'Good' THEN 2  WHEN 'Fair' THEN 3  WHEN 'Needs_Improvement' THEN 4  ELSE 5 END"
+      ],
+      "parameters": [
+        {
+          "displayName": "param_date_start",
+          "keyword": "param_date_start",
+          "dataType": "DATE",
+          "defaultSelection": {
+            "values": {
+              "dataType": "DATE",
+              "values": [
+                {
+                  "value": "now-28d/d"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "displayName": "param_date_end",
+          "keyword": "param_date_end",
+          "dataType": "DATE",
+          "defaultSelection": {
+            "values": {
+              "dataType": "DATE",
+              "values": [
+                {
+                  "value": "now/d"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "ds_speaker_to_window_analysis",
+      "displayName": "Drive-Through Speaker to Window Time",
+      "queryLines": [
+        "SELECT  `Region` as region,  `Brand` as brand,  ROUND(MEASURE(`Avg Speaker to Window Time`), 1) as avg_speaker_to_window,  ROUND(MEASURE(`P95 Speaker to Window Time`), 1) as p95_speaker_to_window\n",
+        "FROM retail_analytics.metrics.mv_drive_through_performance\n",
+        "WHERE `Time Window Start` >= TO_DATE(:param_date_start)  AND `Time Window Start` <= TO_DATE(:param_date_end)\n",
+        "GROUP BY `Region`, `Brand`\n",
+        "HAVING avg_speaker_to_window IS NOT NULL\n",
+        "ORDER BY avg_speaker_to_window DESC"
+      ],
+      "parameters": [
+        {
+          "displayName": "param_date_start",
+          "keyword": "param_date_start",
+          "dataType": "DATE",
+          "defaultSelection": {
+            "values": {
+              "dataType": "DATE",
+              "values": [
+                {
+                  "value": "now-28d/d"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "displayName": "param_date_end",
+          "keyword": "param_date_end",
+          "dataType": "DATE",
+          "defaultSelection": {
+            "values": {
+              "dataType": "DATE",
+              "values": [
+                {
+                  "value": "now/d"
+                }
+              ]
+            }
+          }
+        }
       ]
     },
     {
       "name": "ds_attention_stores",
-      "displayName": "Stores Needing Attention",
+      "displayName": "High Priority Locations",
       "queryLines": [
-        "SELECT store_id, store_type, region, health_status, health_score, current_wait_time_sec as wait_time_sec, current_return_rate_pct as return_rate_pct FROM retail_analytics.gold.gold_store_health WHERE requires_attention = true OR health_status IN ('Critical', 'Poor') ORDER BY health_score ASC LIMIT 50"
+        "SELECT  `Store ID` as store_id,  `Store Type` as brand,  `Region` as region,  `Health Status` as health_status,  ROUND(MEASURE(`Average Health Score`), 1) as health_score,  ROUND(MEASURE(`Avg Wait Time (sec)`), 1) as wait_time_sec,  MEASURE(`Critical Events (1h)`) as critical_events,  ROUND(MEASURE(`Avg Return Rate`), 2) as return_rate_pct\n",
+        "FROM retail_analytics.metrics.mv_store_health\n",
+        "WHERE `Store Category` = 'fast_food'  AND (`Requires Attention` = 'Yes' OR `Health Status` IN ('Critical', 'Poor'))\n",
+        "GROUP BY `Store ID`, `Store Type`, `Region`, `Health Status`\n",
+        "ORDER BY health_score ASC, critical_events DESC\n",
+        "LIMIT 50"
       ]
     },
     {
-      "name": "ds_type_health",
-      "displayName": "Store Type by Health",
+      "name": "ds_top_performers",
+      "displayName": "Top Performing Locations",
       "queryLines": [
-        "SELECT store_type, health_status, COUNT(*) as count FROM retail_analytics.gold.gold_store_health GROUP BY store_type, health_status ORDER BY store_type, health_status"
+        "SELECT  `Store ID` as store_id,  `Store Type` as brand,  `Region` as region,  ROUND(MEASURE(`Average Health Score`), 1) as health_score,  ROUND(MEASURE(`Avg Wait Time (sec)`), 1) as wait_time,  ROUND(MEASURE(`Avg Hourly Sales`), 0) as sales\n",
+        "FROM retail_analytics.metrics.mv_store_health\n",
+        "WHERE `Store Category` = 'fast_food' AND `Health Status` IN ('Excellent', 'Good')\n",
+        "GROUP BY `Store ID`, `Store Type`, `Region`\n",
+        "ORDER BY health_score DESC, wait_time ASC\n",
+        "LIMIT 20"
       ]
     },
     {
-      "name": "ds_sales_trend",
-      "displayName": "Sales Trend",
+      "name": "ds_critical_events_feed",
+      "displayName": "Critical Events Real-Time Feed",
       "queryLines": [
-        "SELECT window_start, region, ROUND(AVG(avg_value), 2) as avg_sales FROM retail_analytics.gold.gold_store_performance_5min WHERE metric_name = 'hourly_sales' AND window_start >= current_timestamp() - INTERVAL 6 HOURS GROUP BY window_start, region ORDER BY window_start"
+        "SELECT  `Event Timestamp` as event_timestamp,  `Store ID` as store_id,  `Region` as region,  `Event Category` as event_category,  `Severity Name` as severity_name,  `Event Type` as event_type\n",
+        "FROM retail_analytics.metrics.mv_store_events\n",
+        "WHERE `Is Critical` = 'Critical'  AND `Store Category` = 'fast_food'  AND `Event Timestamp` >= TO_DATE(:param_date_start)  AND `Event Timestamp` <= TO_DATE(:param_date_end)\n",
+        "GROUP BY `Event Timestamp`, `Store ID`, `Region`, `Event Category`, `Severity Name`, `Event Type`\n",
+        "ORDER BY event_timestamp DESC\n",
+        "LIMIT 100"
+      ],
+      "parameters": [
+        {
+          "displayName": "param_date_start",
+          "keyword": "param_date_start",
+          "dataType": "DATE",
+          "defaultSelection": {
+            "values": {
+              "dataType": "DATE",
+              "values": [
+                {
+                  "value": "now-28d/d"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "displayName": "param_date_end",
+          "keyword": "param_date_end",
+          "dataType": "DATE",
+          "defaultSelection": {
+            "values": {
+              "dataType": "DATE",
+              "values": [
+                {
+                  "value": "now/d"
+                }
+              ]
+            }
+          }
+        }
       ]
     },
     {
-      "name": "ds_wait_time_trend",
-      "displayName": "Wait Time Trend",
+      "name": "ds_daypart_performance",
+      "displayName": "Daypart Performance Analysis",
       "queryLines": [
-        "SELECT window_start, store_type, ROUND(AVG(avg_value), 1) as avg_wait_time FROM retail_analytics.gold.gold_store_performance_5min WHERE metric_name = 'checkout_wait_time_sec' AND window_start >= current_timestamp() - INTERVAL 6 HOURS GROUP BY window_start, store_type ORDER BY window_start"
-      ]
-    },
-    {
-      "name": "ds_conversion_trend",
-      "displayName": "Conversion Trend",
-      "queryLines": [
-        "SELECT window_start, region, ROUND(AVG(avg_value), 2) as avg_conversion FROM retail_analytics.gold.gold_store_performance_5min WHERE metric_name = 'conversion_rate_pct' AND window_start >= current_timestamp() - INTERVAL 6 HOURS GROUP BY window_start, region ORDER BY window_start"
-      ]
-    },
-    {
-      "name": "ds_critical_events",
-      "displayName": "Critical Events",
-      "queryLines": [
-        "SELECT event_timestamp, store_id, region, event_category, severity_name, event_message FROM retail_analytics.gold.gold_store_events WHERE is_critical = true AND event_timestamp >= current_timestamp() - INTERVAL 24 HOURS ORDER BY event_timestamp DESC LIMIT 100"
-      ]
-    },
-    {
-      "name": "ds_category_dist",
-      "displayName": "Category Distribution",
-      "queryLines": [
-        "SELECT event_category, COUNT(*) as count FROM retail_analytics.gold.gold_store_events WHERE event_timestamp >= current_timestamp() - INTERVAL 24 HOURS GROUP BY event_category ORDER BY count DESC"
-      ]
-    },
-    {
-      "name": "ds_severity_dist",
-      "displayName": "Severity Distribution",
-      "queryLines": [
-        "SELECT severity_name, COUNT(*) as count FROM retail_analytics.gold.gold_store_events WHERE event_timestamp >= current_timestamp() - INTERVAL 24 HOURS GROUP BY severity_name ORDER BY count DESC"
-      ]
-    },
-    {
-      "name": "ds_dt_avg_wait",
-      "displayName": "Drive-Through Avg Wait Time",
-      "queryLines": [
-        "SELECT ROUND(AVG(avg_wait_time_sec), 1) as avg_wait FROM retail_analytics.gold.gold_drive_through_performance WHERE window_start >= current_timestamp() - INTERVAL 6 HOURS"
-      ]
-    },
-    {
-      "name": "ds_dt_accuracy",
-      "displayName": "Drive-Through Avg Accuracy",
-      "queryLines": [
-        "SELECT ROUND(AVG(avg_order_accuracy_pct), 1) as avg_accuracy FROM retail_analytics.gold.gold_drive_through_performance WHERE window_start >= current_timestamp() - INTERVAL 6 HOURS"
-      ]
-    },
-    {
-      "name": "ds_dt_throughput",
-      "displayName": "Drive-Through Avg Throughput",
-      "queryLines": [
-        "SELECT ROUND(AVG(avg_throughput_per_hour), 1) as avg_throughput FROM retail_analytics.gold.gold_drive_through_performance WHERE window_start >= current_timestamp() - INTERVAL 6 HOURS"
-      ]
-    },
-    {
-      "name": "ds_dt_performance_grade",
-      "displayName": "Drive-Through Performance Grades",
-      "queryLines": [
-        "SELECT performance_grade, COUNT(DISTINCT store_id) as count FROM retail_analytics.gold.gold_drive_through_performance WHERE window_start >= current_timestamp() - INTERVAL 6 HOURS GROUP BY performance_grade ORDER BY CASE performance_grade WHEN 'Excellent' THEN 1 WHEN 'Good' THEN 2 WHEN 'Fair' THEN 3 ELSE 4 END"
-      ]
-    },
-    {
-      "name": "ds_dt_region_perf",
-      "displayName": "Drive-Through Performance by Region",
-      "queryLines": [
-        "SELECT region, ROUND(AVG(avg_wait_time_sec), 1) as avg_wait, ROUND(AVG(avg_order_accuracy_pct), 1) as avg_accuracy FROM retail_analytics.gold.gold_drive_through_performance WHERE window_start >= current_timestamp() - INTERVAL 6 HOURS GROUP BY region ORDER BY avg_wait DESC"
-      ]
-    },
-    {
-      "name": "ds_dt_worst_stores",
-      "displayName": "Worst Performing Drive-Through Stores",
-      "queryLines": [
-        "SELECT store_id, region, ROUND(AVG(avg_wait_time_sec), 1) as avg_wait, ROUND(AVG(avg_order_accuracy_pct), 1) as avg_accuracy, MAX(performance_grade) as performance_grade FROM retail_analytics.gold.gold_drive_through_performance WHERE window_start >= current_timestamp() - INTERVAL 6 HOURS GROUP BY store_id, region HAVING MAX(performance_grade) IN ('Needs_Improvement', 'Fair') ORDER BY avg_wait DESC LIMIT 20"
+        "SELECT  `Time Period` as time_period,  `Region` as region,  ROUND(MEASURE(`Avg Wait Time (sec)`), 1) as avg_wait_time,  ROUND(MEASURE(`Avg Order Accuracy`), 1) as avg_accuracy,  ROUND(MEASURE(`Avg Throughput`), 1) as avg_throughput\n",
+        "FROM retail_analytics.metrics.mv_drive_through_performance\n",
+        "WHERE `Time Window Start` >= TO_DATE(:param_date_start)  AND `Time Window Start` <= TO_DATE(:param_date_end)\n",
+        "GROUP BY `Time Period`, `Region`\n",
+        "ORDER BY `Time Period`"
+      ],
+      "parameters": [
+        {
+          "displayName": "param_date_start",
+          "keyword": "param_date_start",
+          "dataType": "DATE",
+          "defaultSelection": {
+            "values": {
+              "dataType": "DATE",
+              "values": [
+                {
+                  "value": "now-28d/d"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "displayName": "param_date_end",
+          "keyword": "param_date_end",
+          "dataType": "DATE",
+          "defaultSelection": {
+            "values": {
+              "dataType": "DATE",
+              "values": [
+                {
+                  "value": "now/d"
+                }
+              ]
+            }
+          }
+        }
       ]
     }
   ],
@@ -162,7 +725,7 @@
       "layout": [
         {
           "widget": {
-            "name": "total_stores_counter",
+            "name": "total_locations_kpi",
             "queries": [
               {
                 "name": "main_query",
@@ -184,11 +747,11 @@
               "encodings": {
                 "value": {
                   "fieldName": "total_stores",
-                  "displayName": "Total Stores"
+                  "displayName": "Total QSR Locations"
                 }
               },
               "frame": {
-                "title": "Total Stores",
+                "title": "Total Locations",
                 "showTitle": true,
                 "showDescription": false
               }
@@ -203,16 +766,16 @@
         },
         {
           "widget": {
-            "name": "critical_stores_counter",
+            "name": "at_risk_locations_kpi",
             "queries": [
               {
                 "name": "main_query",
                 "query": {
-                  "datasetName": "ds_critical_count",
+                  "datasetName": "ds_at_risk_stores",
                   "fields": [
                     {
-                      "name": "critical_stores",
-                      "expression": "`critical_stores`"
+                      "name": "at_risk_stores",
+                      "expression": "`at_risk_stores`"
                     }
                   ],
                   "disaggregated": true
@@ -224,14 +787,16 @@
               "widgetType": "counter",
               "encodings": {
                 "value": {
-                  "fieldName": "critical_stores",
-                  "displayName": "Critical Stores"
+                  "fieldName": "at_risk_stores",
+                  "rowNumber": 0,
+                  "displayName": "At-Risk Locations"
                 }
               },
               "frame": {
-                "title": "Stores Needing Attention",
+                "title": "Churn Risk Locations",
                 "showTitle": true,
-                "showDescription": false
+                "showDescription": true,
+                "description": "Locations with high customer churn indicators"
               }
             }
           },
@@ -244,16 +809,16 @@
         },
         {
           "widget": {
-            "name": "avg_health_counter",
+            "name": "csat_score_kpi",
             "queries": [
               {
                 "name": "main_query",
                 "query": {
-                  "datasetName": "ds_avg_health",
+                  "datasetName": "ds_customer_satisfaction",
                   "fields": [
                     {
-                      "name": "avg_health_score",
-                      "expression": "`avg_health_score`"
+                      "name": "avg_csat",
+                      "expression": "`avg_csat`"
                     }
                   ],
                   "disaggregated": true
@@ -265,11 +830,12 @@
               "widgetType": "counter",
               "encodings": {
                 "value": {
-                  "fieldName": "avg_health_score"
+                  "fieldName": "avg_csat",
+                  "displayName": "CSAT Score"
                 }
               },
               "frame": {
-                "title": "Store Health Score",
+                "title": "Customer Satisfaction",
                 "showTitle": true,
                 "showDescription": false
               }
@@ -284,16 +850,41 @@
         },
         {
           "widget": {
-            "name": "total_sales_counter",
+            "name": "regional_performance_geo_map",
             "queries": [
               {
                 "name": "main_query",
                 "query": {
-                  "datasetName": "ds_total_sales",
+                  "datasetName": "ds_regional_performance_geo",
                   "fields": [
                     {
-                      "name": "total_sales",
-                      "expression": "`total_sales`"
+                      "name": "avg_health",
+                      "expression": "`avg_health`"
+                    },
+                    {
+                      "name": "latitude",
+                      "expression": "`latitude`"
+                    },
+                    {
+                      "name": "longitude",
+                      "expression": "`longitude`"
+                    },
+                    {
+                      "name": "store_count",
+                      "expression": "`store_count`"
+                    },
+                    {
+                      "name": "region",
+                      "expression": "`region`"
+                    },
+                    {
+                      "name": "avg_wait_time",
+                      "expression": "`avg_wait_time`"
+                    }
+                  ],
+                  "filters": [
+                    {
+                      "expression": "`region` IN (`region`) OR TRUE"
                     }
                   ],
                   "disaggregated": true
@@ -302,17 +893,68 @@
             ],
             "spec": {
               "version": 2,
-              "widgetType": "counter",
+              "widgetType": "symbol-map",
               "encodings": {
-                "value": {
-                  "fieldName": "total_sales",
-                  "displayName": "Total Sales"
-                }
+                "coordinates": {
+                  "latitude": {
+                    "fieldName": "latitude"
+                  },
+                  "longitude": {
+                    "fieldName": "longitude"
+                  }
+                },
+                "color": {
+                  "fieldName": "avg_health",
+                  "format": {
+                    "type": "number-plain",
+                    "abbreviation": "compact",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 2
+                    },
+                    "hideGroupSeparator": false
+                  },
+                  "displayName": "Health Score",
+                  "scale": {
+                    "type": "quantitative",
+                    "colorRamp": {
+                      "mode": "scheme",
+                      "scheme": "spectral"
+                    },
+                    "domain": {
+                      "min": 0,
+                      "max": 100
+                    },
+                    "reverse": false
+                  }
+                },
+                "size": {
+                  "fieldName": "store_count",
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "displayName": "Store Count"
+                },
+                "extra": [
+                  {
+                    "fieldName": "store_count"
+                  },
+                  {
+                    "fieldName": "region"
+                  },
+                  {
+                    "fieldName": "avg_health"
+                  },
+                  {
+                    "fieldName": "avg_wait_time"
+                  }
+                ]
               },
               "frame": {
-                "title": "Total Sales ($)",
                 "showTitle": true,
-                "showDescription": false
+                "title": "Regional Performance Map",
+                "showDescription": true,
+                "description": "Geospatial view of QSR performance across regions"
               }
             }
           },
@@ -320,159 +962,50 @@
             "x": 0,
             "y": 2,
             "width": 6,
-            "height": 2
+            "height": 6
           }
         },
         {
           "widget": {
-            "name": "health_pie",
+            "name": "churn_risk_table",
             "queries": [
               {
                 "name": "main_query",
                 "query": {
-                  "datasetName": "ds_health_distribution",
+                  "datasetName": "ds_churn_risk_analysis",
                   "fields": [
                     {
-                      "name": "countdistinct(count)",
-                      "expression": "COUNT(DISTINCT `count`)"
+                      "name": "store_id",
+                      "expression": "`store_id`"
                     },
-                    {
-                      "name": "health_status",
-                      "expression": "`health_status`"
-                    }
-                  ],
-                  "disaggregated": false
-                }
-              }
-            ],
-            "spec": {
-              "version": 3,
-              "widgetType": "pie",
-              "encodings": {
-                "angle": {
-                  "fieldName": "countdistinct(count)",
-                  "scale": {
-                    "type": "quantitative"
-                  },
-                  "displayName": "Count of Stores"
-                },
-                "color": {
-                  "fieldName": "health_status",
-                  "displayName": "Health Status",
-                  "scale": {
-                    "type": "categorical"
-                  }
-                }
-              },
-              "frame": {
-                "title": "Store Health Distribution",
-                "showTitle": true,
-                "showDescription": false
-              }
-            }
-          },
-          "position": {
-            "x": 0,
-            "y": 4,
-            "width": 3,
-            "height": 4
-          }
-        },
-        {
-          "widget": {
-            "name": "store_type_bar",
-            "queries": [
-              {
-                "name": "main_query",
-                "query": {
-                  "datasetName": "ds_store_types",
-                  "fields": [
-                    {
-                      "name": "store_type",
-                      "expression": "`store_type`"
-                    },
-                    {
-                      "name": "sum(count)",
-                      "expression": "SUM(`count`)"
-                    }
-                  ],
-                  "disaggregated": false
-                }
-              }
-            ],
-            "spec": {
-              "version": 3,
-              "widgetType": "bar",
-              "encodings": {
-                "x": {
-                  "fieldName": "store_type",
-                  "scale": {
-                    "type": "categorical"
-                  }
-                },
-                "y": {
-                  "fieldName": "sum(count)",
-                  "scale": {
-                    "type": "quantitative"
-                  }
-                },
-                "color": {
-                  "fieldName": "store_type",
-                  "scale": {
-                    "type": "categorical"
-                  }
-                }
-              },
-              "frame": {
-                "title": "Stores by Type",
-                "showTitle": true,
-                "showDescription": false
-              }
-            }
-          },
-          "position": {
-            "x": 3,
-            "y": 4,
-            "width": 3,
-            "height": 4
-          }
-        },
-        {
-          "widget": {
-            "name": "region_table",
-            "queries": [
-              {
-                "name": "main_query",
-                "query": {
-                  "datasetName": "ds_region_summary",
-                  "fields": [
                     {
                       "name": "region",
                       "expression": "`region`"
                     },
                     {
-                      "name": "stores",
-                      "expression": "`stores`"
+                      "name": "brand",
+                      "expression": "`brand`"
                     },
                     {
-                      "name": "apparel_stores",
-                      "expression": "`apparel_stores`"
+                      "name": "health_score",
+                      "expression": "`health_score`"
                     },
                     {
-                      "name": "fast_food_stores",
-                      "expression": "`fast_food_stores`"
+                      "name": "wait_time_sec",
+                      "expression": "`wait_time_sec`"
                     },
                     {
-                      "name": "avg_health",
-                      "expression": "`avg_health`"
+                      "name": "churn_risk_level",
+                      "expression": "`churn_risk_level`"
                     },
                     {
-                      "name": "avg_sales",
-                      "expression": "`avg_sales`"
-                    },
+                      "name": "churn_probability_pct",
+                      "expression": "`churn_probability_pct`"
+                    }
+                  ],
+                  "filters": [
                     {
-                      "name": "critical_events",
-                      "expression": "`critical_events`"
+                      "expression": "`region` IN (`region`) OR TRUE"
                     }
                   ],
                   "disaggregated": true
@@ -485,8 +1018,11 @@
               "encodings": {
                 "columns": [
                   {
-                    "fieldName": "region",
-                    "booleanValues": ["false", "true"],
+                    "fieldName": "store_id",
+                    "booleanValues": [
+                      "false",
+                      "true"
+                    ],
                     "imageUrlTemplate": "{{ @ }}",
                     "imageTitleTemplate": "{{ @ }}",
                     "imageWidth": "",
@@ -499,8 +1035,8 @@
                     "displayAs": "string",
                     "visible": true,
                     "order": 100000,
-                    "title": "Region",
-                    "allowSearch": false,
+                    "title": "Store ID",
+                    "allowSearch": true,
                     "alignContent": "left",
                     "allowHTML": false,
                     "highlightLinks": false,
@@ -508,9 +1044,11 @@
                     "preserveWhitespace": false
                   },
                   {
-                    "fieldName": "stores",
-                    "numberFormat": "0",
-                    "booleanValues": ["false", "true"],
+                    "fieldName": "region",
+                    "booleanValues": [
+                      "false",
+                      "true"
+                    ],
                     "imageUrlTemplate": "{{ @ }}",
                     "imageTitleTemplate": "{{ @ }}",
                     "imageWidth": "",
@@ -519,22 +1057,24 @@
                     "linkTextTemplate": "{{ @ }}",
                     "linkTitleTemplate": "{{ @ }}",
                     "linkOpenInNewTab": true,
-                    "type": "integer",
-                    "displayAs": "number",
+                    "type": "string",
+                    "displayAs": "string",
                     "visible": true,
                     "order": 100001,
-                    "title": "No. of Stores",
-                    "allowSearch": false,
-                    "alignContent": "right",
+                    "title": "Region",
+                    "allowSearch": true,
+                    "alignContent": "left",
                     "allowHTML": false,
                     "highlightLinks": false,
                     "useMonospaceFont": false,
                     "preserveWhitespace": false
                   },
                   {
-                    "fieldName": "apparel_stores",
-                    "numberFormat": "0",
-                    "booleanValues": ["false", "true"],
+                    "fieldName": "brand",
+                    "booleanValues": [
+                      "false",
+                      "true"
+                    ],
                     "imageUrlTemplate": "{{ @ }}",
                     "imageTitleTemplate": "{{ @ }}",
                     "imageWidth": "",
@@ -543,22 +1083,25 @@
                     "linkTextTemplate": "{{ @ }}",
                     "linkTitleTemplate": "{{ @ }}",
                     "linkOpenInNewTab": true,
-                    "type": "integer",
-                    "displayAs": "number",
+                    "type": "string",
+                    "displayAs": "string",
                     "visible": true,
                     "order": 100002,
-                    "title": "Apparel",
-                    "allowSearch": false,
-                    "alignContent": "right",
+                    "title": "Brand",
+                    "allowSearch": true,
+                    "alignContent": "left",
                     "allowHTML": false,
                     "highlightLinks": false,
                     "useMonospaceFont": false,
                     "preserveWhitespace": false
                   },
                   {
-                    "fieldName": "fast_food_stores",
+                    "fieldName": "health_score",
                     "numberFormat": "0",
-                    "booleanValues": ["false", "true"],
+                    "booleanValues": [
+                      "false",
+                      "true"
+                    ],
                     "imageUrlTemplate": "{{ @ }}",
                     "imageTitleTemplate": "{{ @ }}",
                     "imageWidth": "",
@@ -567,22 +1110,81 @@
                     "linkTextTemplate": "{{ @ }}",
                     "linkTitleTemplate": "{{ @ }}",
                     "linkOpenInNewTab": true,
-                    "type": "integer",
+                    "type": "float",
                     "displayAs": "number",
                     "visible": true,
                     "order": 100003,
-                    "title": "Fast Food",
+                    "title": "Health",
                     "allowSearch": false,
-                    "alignContent": "right",
+                    "alignContent": "left",
                     "allowHTML": false,
                     "highlightLinks": false,
                     "useMonospaceFont": false,
-                    "preserveWhitespace": false
+                    "preserveWhitespace": false,
+                    "cellFormat": {
+                      "default": {
+                        "foregroundColor": null
+                      },
+                      "rules": [
+                        {
+                          "if": {
+                            "column": "health_score",
+                            "fn": "<",
+                            "literal": "75"
+                          },
+                          "value": {
+                            "foregroundColor": {
+                              "themeColorType": "visualizationColors",
+                              "position": 5
+                            }
+                          }
+                        },
+                        {
+                          "if": {
+                            "column": "health_score",
+                            "fn": "<",
+                            "literal": "60"
+                          },
+                          "value": {
+                            "foregroundColor": "#E67715"
+                          }
+                        },
+                        {
+                          "if": {
+                            "column": "health_score",
+                            "fn": "<",
+                            "literal": "40"
+                          },
+                          "value": {
+                            "foregroundColor": {
+                              "themeColorType": "visualizationColors",
+                              "position": 6
+                            }
+                          }
+                        },
+                        {
+                          "if": {
+                            "column": "health_score",
+                            "fn": ">=",
+                            "literal": "75"
+                          },
+                          "value": {
+                            "foregroundColor": {
+                              "themeColorType": "visualizationColors",
+                              "position": 8
+                            }
+                          }
+                        }
+                      ]
+                    }
                   },
                   {
-                    "fieldName": "avg_health",
-                    "numberFormat": "0.00",
-                    "booleanValues": ["false", "true"],
+                    "fieldName": "wait_time_sec",
+                    "numberFormat": "0.0",
+                    "booleanValues": [
+                      "false",
+                      "true"
+                    ],
                     "imageUrlTemplate": "{{ @ }}",
                     "imageTitleTemplate": "{{ @ }}",
                     "imageWidth": "",
@@ -595,18 +1197,40 @@
                     "displayAs": "number",
                     "visible": true,
                     "order": 100004,
-                    "title": "Average Health",
+                    "title": "Wait Time (sec)",
                     "allowSearch": false,
-                    "alignContent": "right",
+                    "alignContent": "center",
                     "allowHTML": false,
                     "highlightLinks": false,
                     "useMonospaceFont": false,
-                    "preserveWhitespace": false
+                    "preserveWhitespace": false,
+                    "cellFormat": {
+                      "default": {
+                        "foregroundColor": null
+                      },
+                      "rules": [
+                        {
+                          "if": {
+                            "column": "wait_time_sec",
+                            "fn": ">",
+                            "literal": "360"
+                          },
+                          "value": {
+                            "foregroundColor": {
+                              "themeColorType": "visualizationColors",
+                              "position": 6
+                            }
+                          }
+                        }
+                      ]
+                    }
                   },
                   {
-                    "fieldName": "avg_sales",
-                    "numberFormat": "0.00",
-                    "booleanValues": ["false", "true"],
+                    "fieldName": "churn_risk_level",
+                    "booleanValues": [
+                      "false",
+                      "true"
+                    ],
                     "imageUrlTemplate": "{{ @ }}",
                     "imageTitleTemplate": "{{ @ }}",
                     "imageWidth": "",
@@ -615,22 +1239,55 @@
                     "linkTextTemplate": "{{ @ }}",
                     "linkTitleTemplate": "{{ @ }}",
                     "linkOpenInNewTab": true,
-                    "type": "float",
-                    "displayAs": "number",
+                    "type": "string",
+                    "displayAs": "string",
                     "visible": true,
-                    "order": 100005,
-                    "title": "Average Sales",
+                    "order": 100007,
+                    "title": "Risk Level",
                     "allowSearch": false,
-                    "alignContent": "right",
+                    "alignContent": "left",
                     "allowHTML": false,
                     "highlightLinks": false,
                     "useMonospaceFont": false,
-                    "preserveWhitespace": false
+                    "preserveWhitespace": false,
+                    "cellFormat": {
+                      "default": {
+                        "foregroundColor": null
+                      },
+                      "rules": [
+                        {
+                          "if": {
+                            "column": "churn_risk_level",
+                            "fn": "=",
+                            "literal": "Critical Risk"
+                          },
+                          "value": {
+                            "foregroundColor": {
+                              "themeColorType": "visualizationColors",
+                              "position": 6
+                            }
+                          }
+                        },
+                        {
+                          "if": {
+                            "column": "churn_risk_level",
+                            "fn": "=",
+                            "literal": "High Risk"
+                          },
+                          "value": {
+                            "foregroundColor": "#E36413"
+                          }
+                        }
+                      ]
+                    }
                   },
                   {
-                    "fieldName": "critical_events",
-                    "numberFormat": "0",
-                    "booleanValues": ["false", "true"],
+                    "fieldName": "churn_probability_pct",
+                    "numberFormat": "0%",
+                    "booleanValues": [
+                      "false",
+                      "true"
+                    ],
                     "imageUrlTemplate": "{{ @ }}",
                     "imageTitleTemplate": "{{ @ }}",
                     "imageWidth": "",
@@ -642,27 +1299,83 @@
                     "type": "integer",
                     "displayAs": "number",
                     "visible": true,
-                    "order": 100006,
-                    "title": "Critical Events",
+                    "order": 100008,
+                    "title": "Churn Risk",
                     "allowSearch": false,
-                    "alignContent": "right",
+                    "alignContent": "center",
                     "allowHTML": false,
                     "highlightLinks": false,
                     "useMonospaceFont": false,
-                    "preserveWhitespace": false
+                    "preserveWhitespace": false,
+                    "description": ""
                   }
                 ]
               },
-              "invisibleColumns": [],
+              "invisibleColumns": [
+                {
+                  "numberFormat": "0.00",
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "return_rate_pct",
+                  "type": "float",
+                  "displayAs": "number",
+                  "order": 100005,
+                  "title": "return_rate_pct",
+                  "allowSearch": false,
+                  "alignContent": "right",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                },
+                {
+                  "numberFormat": "0",
+                  "booleanValues": [
+                    "false",
+                    "true"
+                  ],
+                  "imageUrlTemplate": "{{ @ }}",
+                  "imageTitleTemplate": "{{ @ }}",
+                  "imageWidth": "",
+                  "imageHeight": "",
+                  "linkUrlTemplate": "{{ @ }}",
+                  "linkTextTemplate": "{{ @ }}",
+                  "linkTitleTemplate": "{{ @ }}",
+                  "linkOpenInNewTab": true,
+                  "name": "critical_event_count_1h",
+                  "type": "integer",
+                  "displayAs": "number",
+                  "order": 100006,
+                  "title": "critical_event_count_1h",
+                  "allowSearch": false,
+                  "alignContent": "right",
+                  "allowHTML": false,
+                  "highlightLinks": false,
+                  "useMonospaceFont": false,
+                  "preserveWhitespace": false
+                }
+              ],
               "allowHTMLByDefault": false,
               "itemsPerPage": 25,
               "paginationSize": "default",
               "condensed": true,
-              "withRowNumber": false,
+              "withRowNumber": true,
+              "firstNFrozenColumns": 1,
               "frame": {
-                "title": "Performance by Region",
                 "showTitle": true,
-                "showDescription": false
+                "showDescription": true,
+                "title": "Customer Churn Risk Analysis",
+                "description": "Locations with elevated customer churn indicators based on performance metrics"
               }
             }
           },
@@ -670,36 +1383,401 @@
             "x": 0,
             "y": 8,
             "width": 6,
-            "height": 4
+            "height": 5
           }
-        }
-      ],
-      "pageType": "PAGE_TYPE_CANVAS"
-    },
-    {
-      "name": "store_perf_page",
-      "displayName": "Store Performance",
-      "layout": [
+        },
         {
           "widget": {
-            "name": "sales_line",
+            "name": "store_locations_map",
             "queries": [
               {
                 "name": "main_query",
                 "query": {
-                  "datasetName": "ds_sales_trend",
+                  "datasetName": "ds_store_locations_geospatial",
+                  "fields": [
+                    {
+                      "name": "store_id",
+                      "expression": "`store_id`"
+                    },
+                    {
+                      "name": "latitude",
+                      "expression": "`latitude`"
+                    },
+                    {
+                      "name": "longitude",
+                      "expression": "`longitude`"
+                    },
+                    {
+                      "name": "health_score",
+                      "expression": "`health_score`"
+                    },
+                    {
+                      "name": "health_status",
+                      "expression": "`health_status`"
+                    },
+                    {
+                      "name": "region",
+                      "expression": "`region`"
+                    },
+                    {
+                      "name": "brand",
+                      "expression": "`brand`"
+                    },
+                    {
+                      "name": "wait_time_sec",
+                      "expression": "`wait_time_sec`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "symbol-map",
+              "encodings": {
+                "coordinates": {
+                  "latitude": {
+                    "fieldName": "latitude"
+                  },
+                  "longitude": {
+                    "fieldName": "longitude"
+                  }
+                },
+                "color": {
+                  "fieldName": "health_score",
+                  "displayName": "Health Score",
+                  "scale": {
+                    "type": "quantitative",
+                    "colorRamp": {
+                      "mode": "scheme",
+                      "scheme": "redyellowgreen"
+                    },
+                    "domain": {
+                      "min": 0,
+                      "max": 100
+                    },
+                    "reverse": false
+                  }
+                },
+                "size": {
+                  "fieldName": "wait_time_sec",
+                  "displayName": "Wait Time",
+                  "scale": {
+                    "type": "quantitative",
+                    "range": [
+                      50,
+                      300
+                    ]
+                  }
+                },
+                "extra": [
+                  {
+                    "fieldName": "store_id"
+                  },
+                  {
+                    "fieldName": "brand"
+                  },
+                  {
+                    "fieldName": "region"
+                  },
+                  {
+                    "fieldName": "health_status"
+                  },
+                  {
+                    "fieldName": "wait_time_sec"
+                  }
+                ]
+              },
+              "frame": {
+                "title": "Store Performance by Location",
+                "showTitle": true,
+                "showDescription": true,
+                "description": "Interactive map showing health score (color) and wait time (size) for each location"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 13,
+            "width": 6,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "hme_performance_heatmap",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_hme_performance_map",
+                  "fields": [
+                    {
+                      "name": "store_id",
+                      "expression": "`store_id`"
+                    },
+                    {
+                      "name": "latitude",
+                      "expression": "`latitude`"
+                    },
+                    {
+                      "name": "longitude",
+                      "expression": "`longitude`"
+                    },
+                    {
+                      "name": "avg_otd_sec",
+                      "expression": "`avg_otd_sec`"
+                    },
+                    {
+                      "name": "avg_throughput",
+                      "expression": "`avg_throughput`"
+                    },
+                    {
+                      "name": "region",
+                      "expression": "`region`"
+                    },
+                    {
+                      "name": "brand",
+                      "expression": "`brand`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "symbol-map",
+              "encodings": {
+                "coordinates": {
+                  "latitude": {
+                    "fieldName": "latitude"
+                  },
+                  "longitude": {
+                    "fieldName": "longitude"
+                  }
+                },
+                "color": {
+                  "fieldName": "avg_otd_sec",
+                  "displayName": "Avg OTD Time (sec)",
+                  "scale": {
+                    "type": "quantitative",
+                    "colorRamp": {
+                      "mode": "scheme",
+                      "scheme": "redyellowgreen"
+                    },
+                    "domain": {
+                      "min": 200,
+                      "max": 400
+                    },
+                    "reverse": true
+                  }
+                },
+                "size": {
+                  "fieldName": "avg_throughput",
+                  "displayName": "Throughput (cars/hr)",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "extra": [
+                  {
+                    "fieldName": "store_id"
+                  },
+                  {
+                    "fieldName": "brand"
+                  },
+                  {
+                    "fieldName": "region"
+                  }
+                ]
+              },
+              "frame": {
+                "title": "Drive-Thru Performance Heat Map (Last 7 Days)",
+                "showTitle": true,
+                "showDescription": true,
+                "description": "HME Timer System: OTD time (color) and throughput (size) by location"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 19,
+            "width": 6,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "hme_kpis_breakdown",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_hme_kpis_summary",
+                  "fields": [
+                    {
+                      "name": "display_name",
+                      "expression": "`display_name`"
+                    },
+                    {
+                      "name": "avg_value",
+                      "expression": "`avg_value`"
+                    },
+                    {
+                      "name": "p95_value",
+                      "expression": "`p95_value`"
+                    },
+                    {
+                      "name": "sensor_type",
+                      "expression": "`sensor_type`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "display_name",
+                  "displayName": "HME Metric",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "avg_value",
+                  "displayName": "Average Value",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "sensor_type",
+                  "displayName": "Hardware Source",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
+              },
+              "frame": {
+                "title": "HME Speed of Service KPIs (7-Day Average)",
+                "showTitle": true,
+                "showDescription": true,
+                "description": "Drive-Thru Timer System metrics from HME hardware sensors"
+              },
+              "style": {
+                "showGridlines": true,
+                "showLegend": true
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 25,
+            "width": 6,
+            "height": 5
+          }
+        },
+        {
+          "widget": {
+            "name": "hme_regional_breakdown",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_hme_breakdown_by_region",
                   "fields": [
                     {
                       "name": "region",
                       "expression": "`region`"
                     },
                     {
-                      "name": "window_start",
-                      "expression": "`window_start`"
+                      "name": "display_name",
+                      "expression": "`display_name`"
                     },
                     {
-                      "name": "sum(avg_sales)",
-                      "expression": "SUM(`avg_sales`)"
+                      "name": "avg_value",
+                      "expression": "`avg_value`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "heatmap",
+              "encodings": {
+                "x": {
+                  "fieldName": "display_name",
+                  "displayName": "HME Metric",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "region",
+                  "displayName": "Region",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "color": {
+                  "fieldName": "avg_value",
+                  "displayName": "Average Value",
+                  "scale": {
+                    "type": "quantitative",
+                    "colorRamp": {
+                      "mode": "scheme",
+                      "scheme": "redyellowgreen"
+                    },
+                    "reverse": true
+                  }
+                }
+              },
+              "frame": {
+                "title": "HME KPI Performance by Region",
+                "showTitle": true,
+                "showDescription": true,
+                "description": "Regional comparison of drive-thru timer metrics"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 30,
+            "width": 6,
+            "height": 5
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_CANVAS"
+    },
+    {
+      "name": "operational_excellence",
+      "displayName": "Operational Excellence Intelligence",
+      "layout": [
+        {
+          "widget": {
+            "name": "peak_hours_heatmap",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_peak_hours_analysis",
+                  "fields": [
+                    {
+                      "name": "day_part",
+                      "expression": "`day_part`"
+                    },
+                    {
+                      "name": "region",
+                      "expression": "`region`"
                     }
                   ],
                   "disaggregated": false
@@ -708,18 +1786,86 @@
             ],
             "spec": {
               "version": 3,
-              "widgetType": "line",
+              "widgetType": "heatmap",
+              "encodings": {
+                "y": {
+                  "fieldName": "region",
+                  "displayName": "Region",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "color": {
+                  "fieldName": "day_part",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
+              },
+              "frame": {
+                "title": "Daypart Performance Heatmap",
+                "showTitle": true,
+                "showDescription": true,
+                "description": "Identify peak service periods and capacity constraints by hour and region"
+              },
+              "style": {}
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 6,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "service_channel_scatter",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_service_channel_comparison",
+                  "fields": [
+                    {
+                      "name": "store_id",
+                      "expression": "`store_id`"
+                    },
+                    {
+                      "name": "region",
+                      "expression": "`region`"
+                    },
+                    {
+                      "name": "dt_wait",
+                      "expression": "`dt_wait`"
+                    },
+                    {
+                      "name": "instore_wait",
+                      "expression": "`instore_wait`"
+                    },
+                    {
+                      "name": "mobile_wait",
+                      "expression": "`mobile_wait`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "scatter",
               "encodings": {
                 "x": {
-                  "fieldName": "window_start",
-                  "displayName": "Time",
+                  "fieldName": "dt_wait",
+                  "displayName": "Drive-Through Wait (sec)",
                   "scale": {
-                    "type": "temporal"
+                    "type": "quantitative"
                   }
                 },
                 "y": {
-                  "fieldName": "sum(avg_sales)",
-                  "displayName": "Average Sales",
+                  "fieldName": "instore_wait",
+                  "displayName": "In-Store Wait (sec)",
                   "scale": {
                     "type": "quantitative"
                   }
@@ -728,113 +1874,178 @@
                   "fieldName": "region",
                   "displayName": "Region",
                   "scale": {
-                    "type": "categorical"
+                    "type": "categorical",
+                    "range": [
+                      "#D52B1E",
+                      "#FFC72C",
+                      "#502314",
+                      "#E31837",
+                      "#FF9800"
+                    ]
+                  }
+                },
+                "size": {
+                  "fieldName": "mobile_wait",
+                  "displayName": "Mobile Pickup Wait",
+                  "scale": {
+                    "type": "quantitative",
+                    "range": [
+                      50,
+                      500
+                    ]
                   }
                 }
               },
               "frame": {
-                "title": "Sales Trend by Region",
+                "title": "Multi-Channel Performance Correlation Analysis",
                 "showTitle": true,
-                "showDescription": false
+                "showDescription": true,
+                "description": "Scatter plot comparing wait times across service channels. Bubble size = Mobile Pickup wait time"
+              },
+              "annotations": [
+                {
+                  "type": "horizontal",
+                  "value": 180,
+                  "label": "In-Store Target",
+                  "color": "#4CAF50"
+                },
+                {
+                  "type": "vertical",
+                  "value": 180,
+                  "label": "DT Target",
+                  "color": "#4CAF50"
+                }
+              ],
+              "interactivity": {
+                "enableCrossFiltering": true,
+                "filterField": "region",
+                "enableBrushing": true
               }
             }
           },
           "position": {
             "x": 0,
-            "y": 0,
+            "y": 6,
             "width": 6,
-            "height": 4
+            "height": 6
           }
         },
         {
           "widget": {
-            "name": "wait_time_line",
+            "name": "speaker_to_window_analysis",
             "queries": [
               {
                 "name": "main_query",
                 "query": {
-                  "datasetName": "ds_wait_time_trend",
-                  "fields": [
-                    {
-                      "name": "store_type",
-                      "expression": "`store_type`"
-                    },
-                    {
-                      "name": "window_start",
-                      "expression": "`window_start`"
-                    },
-                    {
-                      "name": "sum(avg_wait_time)",
-                      "expression": "SUM(`avg_wait_time`)"
-                    }
-                  ],
-                  "disaggregated": false
-                }
-              }
-            ],
-            "spec": {
-              "version": 3,
-              "widgetType": "line",
-              "encodings": {
-                "x": {
-                  "fieldName": "window_start",
-                  "displayName": "Time",
-                  "scale": {
-                    "type": "temporal"
-                  }
-                },
-                "y": {
-                  "fieldName": "sum(avg_wait_time)",
-                  "displayName": "Average Wait Time",
-                  "scale": {
-                    "type": "quantitative"
-                  }
-                },
-                "color": {
-                  "fieldName": "store_type",
-                  "displayName": "Store Type",
-                  "scale": {
-                    "type": "categorical"
-                  }
-                }
-              },
-              "frame": {
-                "title": "Checkout Wait Time by Store Type",
-                "showTitle": true,
-                "showDescription": false
-              }
-            }
-          },
-          "position": {
-            "x": 0,
-            "y": 4,
-            "width": 6,
-            "height": 4
-          }
-        },
-        {
-          "widget": {
-            "name": "conversion_area",
-            "queries": [
-              {
-                "name": "main_query",
-                "query": {
-                  "datasetName": "ds_conversion_trend",
+                  "datasetName": "ds_speaker_to_window_analysis",
                   "fields": [
                     {
                       "name": "region",
                       "expression": "`region`"
                     },
                     {
+                      "name": "brand",
+                      "expression": "`brand`"
+                    },
+                    {
+                      "name": "avg_speaker_to_window",
+                      "expression": "`avg_speaker_to_window`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "region",
+                  "displayName": "Region",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "avg_speaker_to_window",
+                  "displayName": "Speaker to Window Time (sec)",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "brand",
+                  "displayName": "Brand",
+                  "scale": {
+                    "type": "categorical",
+                    "mappings": [
+                      {
+                        "value": "BurgerKing",
+                        "color": "#30444F"
+                      },
+                      {
+                        "value": "DriveThruExpress",
+                        "color": "#31A93D"
+                      },
+                      {
+                        "value": "QuickBite",
+                        "color": "#378CAF"
+                      },
+                      {
+                        "value": "TimHortons",
+                        "color": "#CD6558"
+                      }
+                    ]
+                  }
+                }
+              },
+              "frame": {
+                "title": "Drive-Through Speaker to Window Performance",
+                "showTitle": true,
+                "showDescription": true,
+                "description": "Critical operational metric for drive-through efficiency"
+              },
+              "style": {
+                "showGridlines": true,
+                "showLegend": true
+              },
+              "interactivity": {
+                "enableCrossFiltering": true,
+                "filterField": "region"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 12,
+            "width": 3,
+            "height": 5
+          }
+        },
+        {
+          "widget": {
+            "name": "throughput_by_brand",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_throughput_by_brand",
+                  "fields": [
+                    {
                       "name": "window_start",
                       "expression": "`window_start`"
                     },
                     {
-                      "name": "avg(avg_conversion)",
-                      "expression": "AVG(`avg_conversion`)"
+                      "name": "brand",
+                      "expression": "`brand`"
+                    },
+                    {
+                      "name": "cars_per_hour",
+                      "expression": "`cars_per_hour`"
                     }
                   ],
-                  "disaggregated": false
+                  "disaggregated": true
                 }
               }
             ],
@@ -850,77 +2061,90 @@
                   }
                 },
                 "y": {
-                  "fieldName": "avg(avg_conversion)",
-                  "displayName": "Average Conversion Rate",
+                  "fieldName": "cars_per_hour",
+                  "displayName": "Cars Per Hour",
                   "scale": {
                     "type": "quantitative"
                   }
                 },
                 "color": {
-                  "fieldName": "region",
-                  "displayName": "Region",
+                  "fieldName": "brand",
+                  "displayName": "Brand",
                   "scale": {
-                    "type": "categorical"
+                    "type": "categorical",
+                    "mappings": [
+                      {
+                        "value": "BurgerKing",
+                        "color": "#30444F"
+                      },
+                      {
+                        "value": "DriveThruExpress",
+                        "color": "#31A93D"
+                      },
+                      {
+                        "value": "QuickBite",
+                        "color": "#378CAF"
+                      },
+                      {
+                        "value": "TimHortons",
+                        "color": "#CD6558"
+                      }
+                    ]
                   }
                 }
               },
               "frame": {
-                "title": "Conversion Rate by Region",
+                "title": "Throughput Performance by Brand",
                 "showTitle": true,
-                "showDescription": false
+                "showDescription": true,
+                "description": "Drive-through throughput capacity analysis"
+              },
+              "style": {
+                "showGridlines": true,
+                "areaOpacity": 0.7,
+                "stackMode": "layered"
+              },
+              "annotations": [
+                {
+                  "type": "horizontal",
+                  "value": 40,
+                  "label": "Target Throughput",
+                  "color": "#4CAF50"
+                }
+              ],
+              "interactivity": {
+                "enableCrossFiltering": true,
+                "filterField": "brand"
               }
             }
           },
           "position": {
-            "x": 0,
-            "y": 8,
-            "width": 6,
-            "height": 4
+            "x": 3,
+            "y": 12,
+            "width": 3,
+            "height": 5
           }
-        }
-      ],
-      "pageType": "PAGE_TYPE_CANVAS"
-    },
-    {
-      "name": "store_health_page",
-      "displayName": "Store Health",
-      "layout": [
+        },
         {
           "widget": {
-            "name": "attention_table",
+            "name": "order_accuracy_by_brand",
             "queries": [
               {
                 "name": "main_query",
                 "query": {
-                  "datasetName": "ds_attention_stores",
+                  "datasetName": "ds_order_accuracy_trend",
                   "fields": [
                     {
-                      "name": "store_id",
-                      "expression": "`store_id`"
+                      "name": "window_start",
+                      "expression": "`window_start`"
                     },
                     {
-                      "name": "store_type",
-                      "expression": "`store_type`"
+                      "name": "brand",
+                      "expression": "`brand`"
                     },
                     {
-                      "name": "region",
-                      "expression": "`region`"
-                    },
-                    {
-                      "name": "health_status",
-                      "expression": "`health_status`"
-                    },
-                    {
-                      "name": "health_score",
-                      "expression": "`health_score`"
-                    },
-                    {
-                      "name": "wait_time_sec",
-                      "expression": "`wait_time_sec`"
-                    },
-                    {
-                      "name": "return_rate_pct",
-                      "expression": "`return_rate_pct`"
+                      "name": "accuracy_pct",
+                      "expression": "`accuracy_pct`"
                     }
                   ],
                   "disaggregated": true
@@ -928,218 +2152,177 @@
               }
             ],
             "spec": {
-              "version": 1,
-              "widgetType": "table",
+              "version": 3,
+              "widgetType": "line",
               "encodings": {
-                "columns": [
-                  {
-                    "fieldName": "store_id",
-                    "booleanValues": ["false", "true"],
-                    "imageUrlTemplate": "{{ @ }}",
-                    "imageTitleTemplate": "{{ @ }}",
-                    "imageWidth": "",
-                    "imageHeight": "",
-                    "linkUrlTemplate": "{{ @ }}",
-                    "linkTextTemplate": "{{ @ }}",
-                    "linkTitleTemplate": "{{ @ }}",
-                    "linkOpenInNewTab": true,
-                    "type": "string",
-                    "displayAs": "string",
-                    "visible": true,
-                    "order": 100000,
-                    "title": "Store",
-                    "allowSearch": true,
-                    "alignContent": "left",
-                    "allowHTML": false,
-                    "highlightLinks": false,
-                    "useMonospaceFont": false,
-                    "preserveWhitespace": false
-                  },
-                  {
-                    "fieldName": "store_type",
-                    "booleanValues": ["false", "true"],
-                    "imageUrlTemplate": "{{ @ }}",
-                    "imageTitleTemplate": "{{ @ }}",
-                    "imageWidth": "",
-                    "imageHeight": "",
-                    "linkUrlTemplate": "{{ @ }}",
-                    "linkTextTemplate": "{{ @ }}",
-                    "linkTitleTemplate": "{{ @ }}",
-                    "linkOpenInNewTab": true,
-                    "type": "string",
-                    "displayAs": "string",
-                    "visible": true,
-                    "order": 100001,
-                    "title": "Store Type",
-                    "allowSearch": false,
-                    "alignContent": "left",
-                    "allowHTML": false,
-                    "highlightLinks": false,
-                    "useMonospaceFont": false,
-                    "preserveWhitespace": false
-                  },
-                  {
-                    "fieldName": "region",
-                    "booleanValues": ["false", "true"],
-                    "imageUrlTemplate": "{{ @ }}",
-                    "imageTitleTemplate": "{{ @ }}",
-                    "imageWidth": "",
-                    "imageHeight": "",
-                    "linkUrlTemplate": "{{ @ }}",
-                    "linkTextTemplate": "{{ @ }}",
-                    "linkTitleTemplate": "{{ @ }}",
-                    "linkOpenInNewTab": true,
-                    "type": "string",
-                    "displayAs": "string",
-                    "visible": true,
-                    "order": 100002,
-                    "title": "Region",
-                    "allowSearch": false,
-                    "alignContent": "left",
-                    "allowHTML": false,
-                    "highlightLinks": false,
-                    "useMonospaceFont": false,
-                    "preserveWhitespace": false
-                  },
-                  {
-                    "fieldName": "health_status",
-                    "booleanValues": ["false", "true"],
-                    "imageUrlTemplate": "{{ @ }}",
-                    "imageTitleTemplate": "{{ @ }}",
-                    "imageWidth": "",
-                    "imageHeight": "",
-                    "linkUrlTemplate": "{{ @ }}",
-                    "linkTextTemplate": "{{ @ }}",
-                    "linkTitleTemplate": "{{ @ }}",
-                    "linkOpenInNewTab": true,
-                    "type": "string",
-                    "displayAs": "string",
-                    "visible": true,
-                    "order": 100003,
-                    "title": "Health",
-                    "allowSearch": false,
-                    "alignContent": "left",
-                    "allowHTML": false,
-                    "highlightLinks": false,
-                    "useMonospaceFont": false,
-                    "preserveWhitespace": false
-                  },
-                  {
-                    "fieldName": "health_score",
-                    "numberFormat": "0",
-                    "booleanValues": ["false", "true"],
-                    "imageUrlTemplate": "{{ @ }}",
-                    "imageTitleTemplate": "{{ @ }}",
-                    "imageWidth": "",
-                    "imageHeight": "",
-                    "linkUrlTemplate": "{{ @ }}",
-                    "linkTextTemplate": "{{ @ }}",
-                    "linkTitleTemplate": "{{ @ }}",
-                    "linkOpenInNewTab": true,
-                    "type": "integer",
-                    "displayAs": "number",
-                    "visible": true,
-                    "order": 100004,
-                    "title": "Health Score",
-                    "allowSearch": false,
-                    "alignContent": "right",
-                    "allowHTML": false,
-                    "highlightLinks": false,
-                    "useMonospaceFont": false,
-                    "preserveWhitespace": false
-                  },
-                  {
-                    "fieldName": "wait_time_sec",
-                    "numberFormat": "0.00",
-                    "booleanValues": ["false", "true"],
-                    "imageUrlTemplate": "{{ @ }}",
-                    "imageTitleTemplate": "{{ @ }}",
-                    "imageWidth": "",
-                    "imageHeight": "",
-                    "linkUrlTemplate": "{{ @ }}",
-                    "linkTextTemplate": "{{ @ }}",
-                    "linkTitleTemplate": "{{ @ }}",
-                    "linkOpenInNewTab": true,
-                    "type": "float",
-                    "displayAs": "number",
-                    "visible": true,
-                    "order": 100005,
-                    "title": "Checkout Wait Time Secs",
-                    "allowSearch": false,
-                    "alignContent": "right",
-                    "allowHTML": false,
-                    "highlightLinks": false,
-                    "useMonospaceFont": false,
-                    "preserveWhitespace": false
-                  },
-                  {
-                    "fieldName": "return_rate_pct",
-                    "numberFormat": "0.00",
-                    "booleanValues": ["false", "true"],
-                    "imageUrlTemplate": "{{ @ }}",
-                    "imageTitleTemplate": "{{ @ }}",
-                    "imageWidth": "",
-                    "imageHeight": "",
-                    "linkUrlTemplate": "{{ @ }}",
-                    "linkTextTemplate": "{{ @ }}",
-                    "linkTitleTemplate": "{{ @ }}",
-                    "linkOpenInNewTab": true,
-                    "type": "float",
-                    "displayAs": "number",
-                    "visible": true,
-                    "order": 100006,
-                    "title": "Return Rate %",
-                    "allowSearch": false,
-                    "alignContent": "right",
-                    "allowHTML": false,
-                    "highlightLinks": false,
-                    "useMonospaceFont": false,
-                    "preserveWhitespace": false
+                "x": {
+                  "fieldName": "window_start",
+                  "displayName": "Time",
+                  "scale": {
+                    "type": "temporal"
                   }
-                ]
+                },
+                "y": {
+                  "fieldName": "accuracy_pct",
+                  "displayName": "Order Accuracy %",
+                  "scale": {
+                    "type": "quantitative",
+                    "domain": [
+                      85,
+                      100
+                    ]
+                  }
+                },
+                "color": {
+                  "fieldName": "brand",
+                  "displayName": "Brand",
+                  "scale": {
+                    "type": "categorical",
+                    "mappings": [
+                      {
+                        "value": "BurgerKing",
+                        "color": "#30444F"
+                      },
+                      {
+                        "value": "DriveThruExpress",
+                        "color": "#31A93D"
+                      },
+                      {
+                        "value": "QuickBite",
+                        "color": "#378CAF"
+                      },
+                      {
+                        "value": "TimHortons",
+                        "color": "#CD6558"
+                      }
+                    ]
+                  }
+                }
               },
-              "invisibleColumns": [],
-              "allowHTMLByDefault": false,
-              "itemsPerPage": 25,
-              "paginationSize": "default",
-              "condensed": true,
-              "withRowNumber": false,
               "frame": {
-                "showDescription": false,
-                "title": "Stores Requiring Attention",
-                "showTitle": true
+                "title": "Order Accuracy Trend by Brand",
+                "showTitle": true,
+                "showDescription": true,
+                "description": "Track order accuracy as a key churn predictor"
+              },
+              "style": {
+                "showGridlines": true,
+                "lineWidth": 3,
+                "showDataPoints": true
+              },
+              "annotations": [
+                {
+                  "type": "horizontal",
+                  "value": 95,
+                  "label": "Target: 95%",
+                  "color": "#4CAF50"
+                },
+                {
+                  "type": "horizontal",
+                  "value": 90,
+                  "label": "Minimum: 90%",
+                  "color": "#FF9800"
+                }
+              ],
+              "interactivity": {
+                "enableCrossFiltering": true,
+                "filterField": "brand"
               }
             }
           },
           "position": {
             "x": 0,
-            "y": 0,
+            "y": 17,
             "width": 6,
-            "height": 6
+            "height": 5
           }
         },
         {
           "widget": {
-            "name": "health_by_type_bar",
+            "name": "performance_grade_pie",
             "queries": [
               {
                 "name": "main_query",
                 "query": {
-                  "datasetName": "ds_type_health",
+                  "datasetName": "ds_performance_grade_dist",
                   "fields": [
                     {
-                      "name": "store_type",
-                      "expression": "`store_type`"
+                      "name": "performance_grade",
+                      "expression": "`performance_grade`"
                     },
                     {
-                      "name": "health_status",
-                      "expression": "`health_status`"
-                    },
-                    {
-                      "name": "sum(count)",
-                      "expression": "SUM(`count`)"
+                      "name": "store_count",
+                      "expression": "`store_count`"
                     }
                   ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "pie",
+              "encodings": {
+                "angle": {
+                  "fieldName": "store_count",
+                  "displayName": "Store Count",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "performance_grade",
+                  "displayName": "Performance Grade",
+                  "scale": {
+                    "type": "categorical",
+                    "domain": [
+                      "Excellent",
+                      "Good",
+                      "Fair",
+                      "Needs_Improvement"
+                    ],
+                    "range": [
+                      "#4CAF50",
+                      "#FFC72C",
+                      "#FF9800",
+                      "#E31837"
+                    ]
+                  }
+                }
+              },
+              "frame": {
+                "title": "Performance Grade Distribution",
+                "showTitle": true,
+                "showDescription": true,
+                "description": "Overall operational performance classification"
+              },
+              "style": {
+                "showLegend": true,
+                "legendPosition": "right",
+                "showPercentages": true,
+                "innerRadius": 40
+              },
+              "interactivity": {
+                "enableCrossFiltering": true,
+                "filterField": "performance_grade"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 22,
+            "width": 3,
+            "height": 5
+          }
+        },
+        {
+          "widget": {
+            "name": "top_performers_leaderboard",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_daypart_performance",
                   "disaggregated": false
                 }
               }
@@ -1147,59 +2330,39 @@
             "spec": {
               "version": 3,
               "widgetType": "bar",
-              "encodings": {
-                "x": {
-                  "fieldName": "health_status",
-                  "scale": {
-                    "type": "categorical"
-                  }
-                },
-                "y": {
-                  "fieldName": "sum(count)",
-                  "scale": {
-                    "type": "quantitative"
-                  }
-                },
-                "color": {
-                  "fieldName": "store_type",
-                  "scale": {
-                    "type": "categorical"
-                  }
-                }
-              },
-              "frame": {
-                "title": "Health by Store Type",
-                "showTitle": true,
-                "showDescription": false
-              }
+              "encodings": {}
             }
           },
           "position": {
-            "x": 0,
-            "y": 6,
-            "width": 6,
-            "height": 4
+            "x": 3,
+            "y": 22,
+            "width": 3,
+            "height": 5
           }
         }
       ],
       "pageType": "PAGE_TYPE_CANVAS"
     },
     {
-      "name": "drive_through_page",
-      "displayName": "Drive-Through Performance",
+      "name": "global_filters",
+      "displayName": "Global Filters",
       "layout": [
         {
           "widget": {
-            "name": "dt_avg_wait_counter",
+            "name": "date_range_filter",
             "queries": [
               {
-                "name": "main_query",
+                "name": "date_filter_query",
                 "query": {
-                  "datasetName": "ds_dt_avg_wait",
+                  "datasetName": "ds_date_range",
                   "fields": [
                     {
-                      "name": "avg_wait",
-                      "expression": "`avg_wait`"
+                      "name": "min_date",
+                      "expression": "`min_date`"
+                    },
+                    {
+                      "name": "max_date",
+                      "expression": "`max_date`"
                     }
                   ],
                   "disaggregated": true
@@ -1208,17 +2371,28 @@
             ],
             "spec": {
               "version": 2,
-              "widgetType": "counter",
+              "widgetType": "filter-date-range-picker",
               "encodings": {
-                "value": {
-                  "fieldName": "avg_wait",
-                  "displayName": "Avg Wait Time"
+                "startDate": {
+                  "parameterName": "param_date_start",
+                  "defaultValue": {
+                    "type": "relative",
+                    "value": "now-7d/d"
+                  }
+                },
+                "endDate": {
+                  "parameterName": "param_date_end",
+                  "defaultValue": {
+                    "type": "relative",
+                    "value": "now/d"
+                  }
                 }
               },
               "frame": {
-                "title": "Avg Drive-Through Wait (sec)",
+                "title": "Date Range Filter",
                 "showTitle": true,
-                "showDescription": false
+                "showDescription": true,
+                "description": "Select date range for time-series analysis"
               }
             }
           },
@@ -1231,35 +2405,44 @@
         },
         {
           "widget": {
-            "name": "dt_accuracy_counter",
+            "name": "region_filter",
             "queries": [
               {
-                "name": "main_query",
+                "name": "region_query",
                 "query": {
-                  "datasetName": "ds_dt_accuracy",
+                  "datasetName": "ds_filter_regions",
                   "fields": [
                     {
-                      "name": "avg_accuracy",
-                      "expression": "`avg_accuracy`"
+                      "name": "region",
+                      "expression": "`region`"
                     }
                   ],
-                  "disaggregated": true
+                  "disaggregated": false
                 }
               }
             ],
             "spec": {
               "version": 2,
-              "widgetType": "counter",
+              "widgetType": "filter-multi-select",
               "encodings": {
-                "value": {
-                  "fieldName": "avg_accuracy",
-                  "displayName": "Order Accuracy"
-                }
+                "fields": [
+                  {
+                    "fieldName": "region",
+                    "queryName": "region_query"
+                  }
+                ]
               },
               "frame": {
-                "title": "Avg Order Accuracy (%)",
-                "showTitle": true,
-                "showDescription": false
+                "title": "Region",
+                "showTitle": true
+              },
+              "selection": {
+                "defaultSelection": {
+                  "operator": {
+                    "operator": "AND",
+                    "args": []
+                  }
+                }
               }
             }
           },
@@ -1272,35 +2455,44 @@
         },
         {
           "widget": {
-            "name": "dt_throughput_counter",
+            "name": "brand_filter",
             "queries": [
               {
-                "name": "main_query",
+                "name": "brand_query",
                 "query": {
-                  "datasetName": "ds_dt_throughput",
+                  "datasetName": "ds_filter_brands",
                   "fields": [
                     {
-                      "name": "avg_throughput",
-                      "expression": "`avg_throughput`"
+                      "name": "brand",
+                      "expression": "`brand`"
                     }
                   ],
-                  "disaggregated": true
+                  "disaggregated": false
                 }
               }
             ],
             "spec": {
               "version": 2,
-              "widgetType": "counter",
+              "widgetType": "filter-multi-select",
               "encodings": {
-                "value": {
-                  "fieldName": "avg_throughput",
-                  "displayName": "Throughput"
-                }
+                "fields": [
+                  {
+                    "fieldName": "brand",
+                    "queryName": "brand_query"
+                  }
+                ]
               },
               "frame": {
-                "title": "Avg Throughput (cars/hr)",
-                "showTitle": true,
-                "showDescription": false
+                "title": "Brand / Concept",
+                "showTitle": true
+              },
+              "selection": {
+                "defaultSelection": {
+                  "operator": {
+                    "operator": "AND",
+                    "args": []
+                  }
+                }
               }
             }
           },
@@ -1310,630 +2502,51 @@
             "width": 2,
             "height": 2
           }
-        },
-        {
-          "widget": {
-            "name": "dt_performance_pie",
-            "queries": [
-              {
-                "name": "main_query",
-                "query": {
-                  "datasetName": "ds_dt_performance_grade",
-                  "fields": [
-                    {
-                      "name": "countdistinct(count)",
-                      "expression": "COUNT(DISTINCT `count`)"
-                    },
-                    {
-                      "name": "performance_grade",
-                      "expression": "`performance_grade`"
-                    }
-                  ],
-                  "disaggregated": false
-                }
-              }
-            ],
-            "spec": {
-              "version": 3,
-              "widgetType": "pie",
-              "encodings": {
-                "angle": {
-                  "fieldName": "countdistinct(count)",
-                  "scale": {
-                    "type": "quantitative"
-                  },
-                  "displayName": "Store Count"
-                },
-                "color": {
-                  "fieldName": "performance_grade",
-                  "displayName": "Performance Grade",
-                  "scale": {
-                    "type": "categorical"
-                  }
-                }
-              },
-              "frame": {
-                "title": "Performance Grade Distribution",
-                "showTitle": true,
-                "showDescription": false
-              }
-            }
-          },
-          "position": {
-            "x": 0,
-            "y": 2,
-            "width": 3,
-            "height": 4
-          }
-        },
-        {
-          "widget": {
-            "name": "dt_wait_by_region",
-            "queries": [
-              {
-                "name": "main_query",
-                "query": {
-                  "datasetName": "ds_dt_region_perf",
-                  "fields": [
-                    {
-                      "name": "region",
-                      "expression": "`region`"
-                    },
-                    {
-                      "name": "sum(avg_wait)",
-                      "expression": "SUM(`avg_wait`)"
-                    }
-                  ],
-                  "disaggregated": false
-                }
-              }
-            ],
-            "spec": {
-              "version": 3,
-              "widgetType": "bar",
-              "encodings": {
-                "x": {
-                  "fieldName": "region",
-                  "scale": {
-                    "type": "categorical"
-                  },
-                  "displayName": "Region"
-                },
-                "y": {
-                  "fieldName": "sum(avg_wait)",
-                  "scale": {
-                    "type": "quantitative"
-                  },
-                  "displayName": "Avg Wait Time (sec)"
-                },
-                "color": {
-                  "fieldName": "region",
-                  "scale": {
-                    "type": "categorical"
-                  }
-                }
-              },
-              "frame": {
-                "title": "Wait Time by Region",
-                "showTitle": true,
-                "showDescription": false
-              }
-            }
-          },
-          "position": {
-            "x": 3,
-            "y": 2,
-            "width": 3,
-            "height": 4
-          }
-        },
-        {
-          "widget": {
-            "name": "dt_worst_stores",
-            "queries": [
-              {
-                "name": "main_query",
-                "query": {
-                  "datasetName": "ds_dt_worst_stores",
-                  "fields": [
-                    {
-                      "name": "store_id",
-                      "expression": "`store_id`"
-                    },
-                    {
-                      "name": "region",
-                      "expression": "`region`"
-                    },
-                    {
-                      "name": "avg_wait",
-                      "expression": "`avg_wait`"
-                    },
-                    {
-                      "name": "avg_accuracy",
-                      "expression": "`avg_accuracy`"
-                    },
-                    {
-                      "name": "performance_grade",
-                      "expression": "`performance_grade`"
-                    }
-                  ],
-                  "disaggregated": true
-                }
-              }
-            ],
-            "spec": {
-              "version": 1,
-              "widgetType": "table",
-              "encodings": {
-                "columns": [
-                  {
-                    "fieldName": "store_id",
-                    "booleanValues": ["false", "true"],
-                    "imageUrlTemplate": "{{ @ }}",
-                    "imageTitleTemplate": "{{ @ }}",
-                    "imageWidth": "",
-                    "imageHeight": "",
-                    "linkUrlTemplate": "{{ @ }}",
-                    "linkTextTemplate": "{{ @ }}",
-                    "linkTitleTemplate": "{{ @ }}",
-                    "linkOpenInNewTab": true,
-                    "type": "string",
-                    "displayAs": "string",
-                    "visible": true,
-                    "order": 100000,
-                    "title": "Store",
-                    "allowSearch": true,
-                    "alignContent": "left",
-                    "allowHTML": false,
-                    "highlightLinks": false,
-                    "useMonospaceFont": false,
-                    "preserveWhitespace": false
-                  },
-                  {
-                    "fieldName": "region",
-                    "booleanValues": ["false", "true"],
-                    "imageUrlTemplate": "{{ @ }}",
-                    "imageTitleTemplate": "{{ @ }}",
-                    "imageWidth": "",
-                    "imageHeight": "",
-                    "linkUrlTemplate": "{{ @ }}",
-                    "linkTextTemplate": "{{ @ }}",
-                    "linkTitleTemplate": "{{ @ }}",
-                    "linkOpenInNewTab": true,
-                    "type": "string",
-                    "displayAs": "string",
-                    "visible": true,
-                    "order": 100001,
-                    "title": "Region",
-                    "allowSearch": false,
-                    "alignContent": "left",
-                    "allowHTML": false,
-                    "highlightLinks": false,
-                    "useMonospaceFont": false,
-                    "preserveWhitespace": false
-                  },
-                  {
-                    "fieldName": "avg_wait",
-                    "numberFormat": "0.00",
-                    "booleanValues": ["false", "true"],
-                    "imageUrlTemplate": "{{ @ }}",
-                    "imageTitleTemplate": "{{ @ }}",
-                    "imageWidth": "",
-                    "imageHeight": "",
-                    "linkUrlTemplate": "{{ @ }}",
-                    "linkTextTemplate": "{{ @ }}",
-                    "linkTitleTemplate": "{{ @ }}",
-                    "linkOpenInNewTab": true,
-                    "type": "float",
-                    "displayAs": "number",
-                    "visible": true,
-                    "order": 100002,
-                    "title": "Wait Time (sec)",
-                    "allowSearch": false,
-                    "alignContent": "right",
-                    "allowHTML": false,
-                    "highlightLinks": false,
-                    "useMonospaceFont": false,
-                    "preserveWhitespace": false
-                  },
-                  {
-                    "fieldName": "avg_accuracy",
-                    "numberFormat": "0.00",
-                    "booleanValues": ["false", "true"],
-                    "imageUrlTemplate": "{{ @ }}",
-                    "imageTitleTemplate": "{{ @ }}",
-                    "imageWidth": "",
-                    "imageHeight": "",
-                    "linkUrlTemplate": "{{ @ }}",
-                    "linkTextTemplate": "{{ @ }}",
-                    "linkTitleTemplate": "{{ @ }}",
-                    "linkOpenInNewTab": true,
-                    "type": "float",
-                    "displayAs": "number",
-                    "visible": true,
-                    "order": 100003,
-                    "title": "Accuracy %",
-                    "allowSearch": false,
-                    "alignContent": "right",
-                    "allowHTML": false,
-                    "highlightLinks": false,
-                    "useMonospaceFont": false,
-                    "preserveWhitespace": false
-                  },
-                  {
-                    "fieldName": "performance_grade",
-                    "booleanValues": ["false", "true"],
-                    "imageUrlTemplate": "{{ @ }}",
-                    "imageTitleTemplate": "{{ @ }}",
-                    "imageWidth": "",
-                    "imageHeight": "",
-                    "linkUrlTemplate": "{{ @ }}",
-                    "linkTextTemplate": "{{ @ }}",
-                    "linkTitleTemplate": "{{ @ }}",
-                    "linkOpenInNewTab": true,
-                    "type": "string",
-                    "displayAs": "string",
-                    "visible": true,
-                    "order": 100004,
-                    "title": "Grade",
-                    "allowSearch": false,
-                    "alignContent": "left",
-                    "allowHTML": false,
-                    "highlightLinks": false,
-                    "useMonospaceFont": false,
-                    "preserveWhitespace": false
-                  }
-                ]
-              },
-              "invisibleColumns": [],
-              "allowHTMLByDefault": false,
-              "itemsPerPage": 25,
-              "paginationSize": "default",
-              "condensed": true,
-              "withRowNumber": false,
-              "frame": {
-                "title": "Stores Needing Improvement",
-                "showTitle": true,
-                "showDescription": false
-              }
-            }
-          },
-          "position": {
-            "x": 0,
-            "y": 6,
-            "width": 6,
-            "height": 4
-          }
         }
       ],
-      "pageType": "PAGE_TYPE_CANVAS"
-    },
-    {
-      "name": "events_page",
-      "displayName": "Events & Alerts",
-      "layout": [
-        {
-          "widget": {
-            "name": "critical_events_table",
-            "queries": [
-              {
-                "name": "main_query",
-                "query": {
-                  "datasetName": "ds_critical_events",
-                  "fields": [
-                    {
-                      "name": "event_timestamp",
-                      "expression": "`event_timestamp`"
-                    },
-                    {
-                      "name": "store_id",
-                      "expression": "`store_id`"
-                    },
-                    {
-                      "name": "region",
-                      "expression": "`region`"
-                    },
-                    {
-                      "name": "event_category",
-                      "expression": "`event_category`"
-                    },
-                    {
-                      "name": "severity_name",
-                      "expression": "`severity_name`"
-                    },
-                    {
-                      "name": "event_message",
-                      "expression": "`event_message`"
-                    }
-                  ],
-                  "disaggregated": true
-                }
-              }
-            ],
-            "spec": {
-              "version": 1,
-              "widgetType": "table",
-              "encodings": {
-                "columns": [
-                  {
-                    "fieldName": "event_timestamp",
-                    "dateTimeFormat": "yyyy-DD-mm HH:00",
-                    "booleanValues": ["false", "true"],
-                    "imageUrlTemplate": "{{ @ }}",
-                    "imageTitleTemplate": "{{ @ }}",
-                    "imageWidth": "",
-                    "imageHeight": "",
-                    "linkUrlTemplate": "{{ @ }}",
-                    "linkTextTemplate": "{{ @ }}",
-                    "linkTitleTemplate": "{{ @ }}",
-                    "linkOpenInNewTab": true,
-                    "type": "datetime",
-                    "displayAs": "datetime",
-                    "visible": true,
-                    "order": 100000,
-                    "title": "Time",
-                    "allowSearch": false,
-                    "alignContent": "right",
-                    "allowHTML": false,
-                    "highlightLinks": false,
-                    "useMonospaceFont": false,
-                    "preserveWhitespace": false
-                  },
-                  {
-                    "fieldName": "store_id",
-                    "booleanValues": ["false", "true"],
-                    "imageUrlTemplate": "{{ @ }}",
-                    "imageTitleTemplate": "{{ @ }}",
-                    "imageWidth": "",
-                    "imageHeight": "",
-                    "linkUrlTemplate": "{{ @ }}",
-                    "linkTextTemplate": "{{ @ }}",
-                    "linkTitleTemplate": "{{ @ }}",
-                    "linkOpenInNewTab": true,
-                    "type": "string",
-                    "displayAs": "string",
-                    "visible": true,
-                    "order": 100001,
-                    "title": "Store",
-                    "allowSearch": false,
-                    "alignContent": "left",
-                    "allowHTML": false,
-                    "highlightLinks": false,
-                    "useMonospaceFont": false,
-                    "preserveWhitespace": false
-                  },
-                  {
-                    "fieldName": "region",
-                    "booleanValues": ["false", "true"],
-                    "imageUrlTemplate": "{{ @ }}",
-                    "imageTitleTemplate": "{{ @ }}",
-                    "imageWidth": "",
-                    "imageHeight": "",
-                    "linkUrlTemplate": "{{ @ }}",
-                    "linkTextTemplate": "{{ @ }}",
-                    "linkTitleTemplate": "{{ @ }}",
-                    "linkOpenInNewTab": true,
-                    "type": "string",
-                    "displayAs": "string",
-                    "visible": true,
-                    "order": 100002,
-                    "title": "Region",
-                    "allowSearch": false,
-                    "alignContent": "left",
-                    "allowHTML": false,
-                    "highlightLinks": false,
-                    "useMonospaceFont": false,
-                    "preserveWhitespace": false
-                  },
-                  {
-                    "fieldName": "event_category",
-                    "booleanValues": ["false", "true"],
-                    "imageUrlTemplate": "{{ @ }}",
-                    "imageTitleTemplate": "{{ @ }}",
-                    "imageWidth": "",
-                    "imageHeight": "",
-                    "linkUrlTemplate": "{{ @ }}",
-                    "linkTextTemplate": "{{ @ }}",
-                    "linkTitleTemplate": "{{ @ }}",
-                    "linkOpenInNewTab": true,
-                    "type": "string",
-                    "displayAs": "string",
-                    "visible": true,
-                    "order": 100003,
-                    "title": "Event Type",
-                    "allowSearch": false,
-                    "alignContent": "left",
-                    "allowHTML": false,
-                    "highlightLinks": false,
-                    "useMonospaceFont": false,
-                    "preserveWhitespace": false
-                  },
-                  {
-                    "fieldName": "severity_name",
-                    "booleanValues": ["false", "true"],
-                    "imageUrlTemplate": "{{ @ }}",
-                    "imageTitleTemplate": "{{ @ }}",
-                    "imageWidth": "",
-                    "imageHeight": "",
-                    "linkUrlTemplate": "{{ @ }}",
-                    "linkTextTemplate": "{{ @ }}",
-                    "linkTitleTemplate": "{{ @ }}",
-                    "linkOpenInNewTab": true,
-                    "type": "string",
-                    "displayAs": "string",
-                    "visible": true,
-                    "order": 100004,
-                    "title": "Severity",
-                    "allowSearch": false,
-                    "alignContent": "left",
-                    "allowHTML": false,
-                    "highlightLinks": false,
-                    "useMonospaceFont": false,
-                    "preserveWhitespace": false
-                  },
-                  {
-                    "fieldName": "event_message",
-                    "booleanValues": ["false", "true"],
-                    "imageUrlTemplate": "{{ @ }}",
-                    "imageTitleTemplate": "{{ @ }}",
-                    "imageWidth": "",
-                    "imageHeight": "",
-                    "linkUrlTemplate": "{{ @ }}",
-                    "linkTextTemplate": "{{ @ }}",
-                    "linkTitleTemplate": "{{ @ }}",
-                    "linkOpenInNewTab": true,
-                    "type": "string",
-                    "displayAs": "string",
-                    "visible": true,
-                    "order": 100005,
-                    "title": "Event Message",
-                    "allowSearch": false,
-                    "alignContent": "left",
-                    "allowHTML": false,
-                    "highlightLinks": false,
-                    "useMonospaceFont": false,
-                    "preserveWhitespace": false
-                  }
-                ]
-              },
-              "invisibleColumns": [],
-              "allowHTMLByDefault": false,
-              "itemsPerPage": 25,
-              "paginationSize": "default",
-              "condensed": true,
-              "withRowNumber": false,
-              "frame": {
-                "showDescription": false,
-                "title": "Recent Critical Events",
-                "showTitle": true
-              }
-            }
-          },
-          "position": {
-            "x": 0,
-            "y": 0,
-            "width": 6,
-            "height": 5
-          }
-        },
-        {
-          "widget": {
-            "name": "category_pie",
-            "queries": [
-              {
-                "name": "main_query",
-                "query": {
-                  "datasetName": "ds_category_dist",
-                  "fields": [
-                    {
-                      "name": "countdistinct(count)",
-                      "expression": "COUNT(DISTINCT `count`)"
-                    },
-                    {
-                      "name": "event_category",
-                      "expression": "`event_category`"
-                    }
-                  ],
-                  "disaggregated": false
-                }
-              }
-            ],
-            "spec": {
-              "version": 3,
-              "widgetType": "pie",
-              "encodings": {
-                "angle": {
-                  "fieldName": "countdistinct(count)",
-                  "scale": {
-                    "type": "quantitative"
-                  },
-                  "displayName": "Event Count"
-                },
-                "color": {
-                  "fieldName": "event_category",
-                  "displayName": "Event Category",
-                  "scale": {
-                    "type": "categorical"
-                  }
-                }
-              },
-              "frame": {
-                "title": "Events by Category",
-                "showTitle": true,
-                "showDescription": false
-              }
-            }
-          },
-          "position": {
-            "x": 0,
-            "y": 5,
-            "width": 3,
-            "height": 4
-          }
-        },
-        {
-          "widget": {
-            "name": "severity_bar",
-            "queries": [
-              {
-                "name": "main_query",
-                "query": {
-                  "datasetName": "ds_severity_dist",
-                  "fields": [
-                    {
-                      "name": "severity_name",
-                      "expression": "`severity_name`"
-                    },
-                    {
-                      "name": "sum(count)",
-                      "expression": "SUM(`count`)"
-                    }
-                  ],
-                  "disaggregated": false
-                }
-              }
-            ],
-            "spec": {
-              "version": 3,
-              "widgetType": "bar",
-              "encodings": {
-                "x": {
-                  "fieldName": "severity_name",
-                  "displayName": "Severity Name",
-                  "scale": {
-                    "type": "categorical"
-                  }
-                },
-                "y": {
-                  "fieldName": "sum(count)",
-                  "displayName": "Count of Events",
-                  "scale": {
-                    "type": "quantitative"
-                  }
-                },
-                "color": {
-                  "fieldName": "severity_name",
-                  "scale": {
-                    "type": "categorical"
-                  }
-                }
-              },
-              "frame": {
-                "title": "Events by Severity",
-                "showTitle": true,
-                "showDescription": false
-              }
-            }
-          },
-          "position": {
-            "x": 3,
-            "y": 5,
-            "width": 3,
-            "height": 4
-          }
-        }
-      ],
-      "pageType": "PAGE_TYPE_CANVAS"
+      "pageType": "PAGE_TYPE_GLOBAL_FILTERS"
     }
-  ]
+  ],
+  "uiSettings": {
+    "theme": {
+      "canvasBackgroundColor": {
+        "light": "#F6FAFB",
+        "dark": "#1B1F23"
+      },
+      "widgetBackgroundColor": {
+        "light": "#FFFFFF",
+        "dark": "#2A2F35"
+      },
+      "widgetBorderColor": {
+        "light": "#D7E1E9",
+        "dark": "#3C444C"
+      },
+      "fontColor": {
+        "light": "#374151",
+        "dark": "#E4E9EE"
+      },
+      "selectionColor": {
+        "light": "#D52B1E",
+        "dark": "#D52B1E"
+      },
+      "visualizationColors": [
+        "#D52B1E",
+        "#FFC72C",
+        "#502314",
+        "#4CAF50",
+        "#FF9800",
+        "#E31837",
+        "#30444F",
+        "#31A93D",
+        "#378CAF",
+        "#CD6558"
+      ],
+      "widgetHeaderAlignment": "LEFT"
+    },
+    "genieSpace": {
+      "isEnabled": true,
+      "enablementMode": "ENABLED"
+    },
+    "applyModeEnabled": false
+  }
 }
