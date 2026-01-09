@@ -200,6 +200,13 @@ AS SELECT
     ELSE 'normal'
   END AS severity_level,
   
+  -- HME hardware integration metadata (fast food only)
+  data_source,
+  sensor_type,
+  CAST(order_value AS DOUBLE) AS order_value,
+  CAST(item_count AS INT) AS item_count,
+  CAST(normalized AS BOOLEAN) AS normalized,
+  
   ingestion_timestamp,
   source_file,
   current_timestamp() AS processed_timestamp

@@ -11,7 +11,7 @@ WorkingDirectory=/opt/retail-generator
 Environment="PATH=/opt/retail-generator/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
 # GCS bucket for metrics data - UPDATE THIS WITH YOUR BUCKET NAME
-Environment="GCS_RETAIL_BUCKET=gs://gcp-sandbox-field-eng-telco-snmp/metrics/"
+Environment="GCS_RETAIL_BUCKET=gs://telco-retail-metrics/metrics/"
 
 # Run the retail data generator:
 # - Events go to local SFTP directory

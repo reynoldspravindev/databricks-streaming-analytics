@@ -86,7 +86,7 @@
         "WHERE `Time Window Start` >= TO_DATE(:param_date_start)  \n",
         "AND `Time Window Start` <= TO_DATE(:param_date_end)  \n",
         "AND `Store Category` = 'fast_food'  \n",
-        "AND `Metric Name` IN ('checkout_wait_time_sec', 'drive_through_wait_time_sec', 'mobile_pickup_wait_time_sec')\n",
+        "AND `Metric Name` IN ('peak_hour_service_time_sec', 'mobile_order_pickup_time_sec', 'transactions_per_hour')\n",
         "GROUP BY `Metric Name`"
       ],
       "parameters": [
@@ -141,12 +141,12 @@
         "`Region` as region,  \n",
         "`Metric Name` as service_channel,  \n",
         "ROUND(MEASURE(`Average Value`), 1) as avg_wait_time,  \n",
-        "CASE    WHEN `Metric Name` = 'drive_through_wait_time_sec' THEN 'Drive-Through'    \n",
-        "        WHEN `Metric Name` = 'checkout_wait_time_sec' THEN 'In-Store'    \n",
-        "        WHEN `Metric Name` = 'mobile_pickup_wait_time_sec' THEN 'Mobile Pickup'    \n",
+        "CASE    WHEN `Metric Name` = 'peak_hour_service_time_sec' THEN 'Peak Hour Service'    \n",
+        "        WHEN `Metric Name` = 'mobile_order_pickup_time_sec' THEN 'Mobile Pickup'    \n",
+        "        WHEN `Metric Name` = 'transactions_per_hour' THEN 'Transactions/Hour'    \n",
         "        ELSE `Metric Name`  END as channel_display_name\n",
         "FROM retail_analytics.metrics.mv_store_performance\n",
-        "WHERE `Time Window Start` >= TO_DATE(:param_date_start)  AND `Time Window Start` <= TO_DATE(:param_date_end)  AND `Store Category` = 'fast_food'  AND `Metric Name` IN ('drive_through_wait_time_sec', 'checkout_wait_time_sec', 'mobile_pickup_wait_time_sec')\n",
+        "WHERE `Time Window Start` >= TO_DATE(:param_date_start)  AND `Time Window Start` <= TO_DATE(:param_date_end)  AND `Store Category` = 'fast_food'  AND `Metric Name` IN ('peak_hour_service_time_sec', 'mobile_order_pickup_time_sec', 'transactions_per_hour')\n",
         "GROUP BY `Time Window Start`, `Region`, `Metric Name`\n",
         "ORDER BY window_start"
       ],
@@ -227,19 +227,32 @@
       "displayName": "HME Drive-Thru Performance Heat Map",
       "queryLines": [
         "SELECT\n",
-        "  `Store ID` as store_id,\n",
-        "  `Latitude` as latitude,\n",
-        "  `Longitude` as longitude,\n",
-        "  `Region` as region,\n",
-        "  `Brand` as brand,\n",
-        "  ROUND(AVG(CASE WHEN `Metric Name` = 'drive_through_total_experience_time_sec' THEN MEASURE(`Average Value`) END), 1) as avg_otd_sec,\n",
-        "  ROUND(AVG(CASE WHEN `Metric Name` = 'drive_through_cars_per_hour' THEN MEASURE(`Average Value`) END), 1) as avg_throughput,\n",
-        "  COUNT(DISTINCT `Time Window Start`) as sample_count\n",
-        "FROM retail_analytics.metrics.mv_hme_speed_of_service\n",
-        "WHERE `Time Window Start` >= DATE_SUB(CURRENT_DATE(), 7)\n",
-        "  AND `Latitude` IS NOT NULL\n",
-        "  AND `Longitude` IS NOT NULL\n",
-        "GROUP BY `Store ID`, `Latitude`, `Longitude`, `Region`, `Brand`\n",
+        "  store_id,\n",
+        "  latitude,\n",
+        "  longitude,\n",
+        "  region,\n",
+        "  brand,\n",
+        "  ROUND(MAX(CASE WHEN metric_name = 'drive_through_total_experience_time_sec' THEN avg_value END), 1) as avg_otd_sec,\n",
+        "  ROUND(MAX(CASE WHEN metric_name = 'drive_through_cars_per_hour' THEN avg_value END), 1) as avg_throughput,\n",
+        "  MAX(sample_count) as sample_count\n",
+        "FROM (\n",
+        "  SELECT\n",
+        "    `Store ID` as store_id,\n",
+        "    `Latitude` as latitude,\n",
+        "    `Longitude` as longitude,\n",
+        "    `Region` as region,\n",
+        "    `Brand` as brand,\n",
+        "    `Metric Name` as metric_name,\n",
+        "    MEASURE(`Average Value`) as avg_value,\n",
+        "    COUNT(DISTINCT `Time Window Start`) as sample_count\n",
+        "  FROM retail_analytics.metrics.mv_hme_speed_of_service\n",
+        "  WHERE `Time Window Start` >= DATE_SUB(CURRENT_DATE(), 7)\n",
+        "    AND `Latitude` IS NOT NULL\n",
+        "    AND `Longitude` IS NOT NULL\n",
+        "    AND `Metric Name` IN ('drive_through_total_experience_time_sec', 'drive_through_cars_per_hour')\n",
+        "  GROUP BY `Store ID`, `Latitude`, `Longitude`, `Region`, `Brand`, `Metric Name`\n",
+        ")\n",
+        "GROUP BY store_id, latitude, longitude, region, brand\n",
         "HAVING sample_count >= 5"
       ]
     },
@@ -348,7 +361,7 @@
       "queryLines": [
         "SELECT  HOUR(`Time Window Start`) as hour,  `Region` as region,  ROUND(MEASURE(`Average Value`), 1) as avg_wait,  MEASURE(`Total Samples`) as transaction_count,  CASE    WHEN HOUR(`Time Window Start`) BETWEEN 6 AND 10 THEN 'Breakfast'    WHEN HOUR(`Time Window Start`) BETWEEN 11 AND 14 THEN 'Lunch'    WHEN HOUR(`Time Window Start`) BETWEEN 17 AND 21 THEN 'Dinner'    ELSE 'Off-Peak'  END as day_part\n",
         "FROM retail_analytics.metrics.mv_store_performance\n",
-        "WHERE `Metric Name` = 'drive_through_wait_time_sec'  AND `Time Window Start` >= TO_DATE(:param_date_start)  AND `Time Window Start` <= TO_DATE(:param_date_end)  AND `Store Category` = 'fast_food'\n",
+        "WHERE `Metric Name` = 'peak_hour_service_time_sec'  AND `Time Window Start` >= TO_DATE(:param_date_start)  AND `Time Window Start` <= TO_DATE(:param_date_end)  AND `Store Category` = 'fast_food'\n",
         "GROUP BY HOUR(`Time Window Start`), `Region`\n",
         "ORDER BY hour"
       ],
@@ -389,16 +402,26 @@
       "name": "ds_service_channel_comparison",
       "displayName": "Service Channel Performance Comparison",
       "queryLines": [
-        "SELECT  `Store ID` as store_id,  `Region` as region,  \n",
-        "MAX(CASE WHEN `Metric Name` = 'checkout_wait_time_sec' THEN MEASURE(`Average Value`) END) as instore_wait,  \n",
-        "MAX(CASE WHEN `Metric Name` = 'drive_through_wait_time_sec' THEN MEASURE(`Average Value`) END) as dt_wait,  \n",
-        "MAX(CASE WHEN `Metric Name` = 'mobile_pickup_wait_time_sec' THEN MEASURE(`Average Value`) END) as mobile_wait\n",
-        "FROM retail_analytics.metrics.mv_store_performance\n",
-        "WHERE `Time Window Start` >= TO_DATE(:param_date_start)  \n",
-        "AND `Time Window Start` <= TO_DATE(:param_date_end)  \n",
-        "AND `Store Category` = 'fast_food'  \n",
-        "AND `Metric Name` IN ('checkout_wait_time_sec', 'drive_through_wait_time_sec', 'mobile_pickup_wait_time_sec')\n",
-        "GROUP BY `Store ID`, `Region`"
+        "SELECT\n",
+        "  store_id,\n",
+        "  region,\n",
+        "  MAX(CASE WHEN metric_name = 'peak_hour_service_time_sec' THEN avg_value END) as peak_service_time,\n",
+        "  MAX(CASE WHEN metric_name = 'mobile_order_pickup_time_sec' THEN avg_value END) as mobile_wait,\n",
+        "  MAX(CASE WHEN metric_name = 'transactions_per_hour' THEN avg_value END) as transactions\n",
+        "FROM (\n",
+        "  SELECT\n",
+        "    `Store ID` as store_id,\n",
+        "    `Region` as region,\n",
+        "    `Metric Name` as metric_name,\n",
+        "    MEASURE(`Average Value`) as avg_value\n",
+        "  FROM retail_analytics.metrics.mv_store_performance\n",
+        "  WHERE `Time Window Start` >= TO_DATE(:param_date_start)\n",
+        "    AND `Time Window Start` <= TO_DATE(:param_date_end)\n",
+        "    AND `Store Category` = 'fast_food'\n",
+        "    AND `Metric Name` IN ('peak_hour_service_time_sec', 'mobile_order_pickup_time_sec', 'transactions_per_hour')\n",
+        "  GROUP BY `Store ID`, `Region`, `Metric Name`\n",
+        ")\n",
+        "GROUP BY store_id, region"
       ],
       "parameters": [
         {
@@ -1857,15 +1880,15 @@
               "widgetType": "scatter",
               "encodings": {
                 "x": {
-                  "fieldName": "dt_wait",
-                  "displayName": "Drive-Through Wait (sec)",
+                  "fieldName": "peak_service_time",
+                  "displayName": "Peak Service Time (sec)",
                   "scale": {
                     "type": "quantitative"
                   }
                 },
                 "y": {
-                  "fieldName": "instore_wait",
-                  "displayName": "In-Store Wait (sec)",
+                  "fieldName": "mobile_wait",
+                  "displayName": "Mobile Pickup Time (sec)",
                   "scale": {
                     "type": "quantitative"
                   }
@@ -1885,8 +1908,8 @@
                   }
                 },
                 "size": {
-                  "fieldName": "mobile_wait",
-                  "displayName": "Mobile Pickup Wait",
+                  "fieldName": "transactions",
+                  "displayName": "Transactions Per Hour",
                   "scale": {
                     "type": "quantitative",
                     "range": [
@@ -1900,7 +1923,7 @@
                 "title": "Multi-Channel Performance Correlation Analysis",
                 "showTitle": true,
                 "showDescription": true,
-                "description": "Scatter plot comparing wait times across service channels. Bubble size = Mobile Pickup wait time"
+                "description": "Scatter plot comparing service performance metrics. Bubble size = Transactions per hour"
               },
               "annotations": [
                 {

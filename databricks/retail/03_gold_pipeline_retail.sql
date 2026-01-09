@@ -43,6 +43,10 @@ AS SELECT
   metric_name,
   metric_unit,
   
+  -- HME hardware metadata (fast food only, NULL for apparel)
+  FIRST(data_source) AS data_source,
+  FIRST(sensor_type) AS sensor_type,
+  
   -- Statistical aggregations
   AVG(value) AS avg_value,
   MIN(value) AS min_value,
@@ -56,6 +60,11 @@ AS SELECT
   -- Anomaly tracking
   SUM(CASE WHEN is_anomaly THEN 1 ELSE 0 END) AS anomaly_count,
   MAX(CASE WHEN is_anomaly THEN value ELSE 0 END) AS max_anomaly_value,
+  
+  -- Order complexity metrics (fast food only, aggregated)
+  AVG(order_value) AS avg_order_value_context,
+  AVG(item_count) AS avg_item_count_context,
+  MAX(normalized) AS normalized,
   
   -- Quality metrics
   COUNT(DISTINCT source_file) AS source_file_count,
@@ -130,7 +139,7 @@ TBLPROPERTIES (
   'pipelines.autoOptimize.managed' = 'true',
   'delta.enableChangeDataFeed' = 'true'
 )
-AS SELECT DISTINCT
+AS SELECT
   store_id,
   store_category,
   store_type,
@@ -171,7 +180,15 @@ AS SELECT DISTINCT
   TRUE AS supply_chain_integration_ready,
   current_timestamp() AS last_updated
   
-FROM retail_analytics.silver.silver_store_metrics;
+FROM retail_analytics.silver.silver_store_metrics
+GROUP BY
+  store_id,
+  store_category,
+  store_type,
+  region,
+  brand,
+  district,
+  address;
 
 -- COMMAND ----------
 

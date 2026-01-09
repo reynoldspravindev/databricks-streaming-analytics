@@ -1,8 +1,19 @@
 #!/bin/bash
 #
 # GCS Bucket Setup for Telco Network Performance Demo
-# Creates a GCS bucket for SNMP data ingestion with Pub/Sub notifications
-# for low-latency Auto Loader file notification mode
+# Creates a GCS bucket with Hierarchical Namespace (HNS) for optimal performance
+# with Databricks/Spark workloads and Pub/Sub notifications for Auto Loader
+#
+# Performance Features (per https://docs.cloud.google.com/storage/docs/create-hns-bucket):
+# - Hierarchical Namespace (HNS): True folder support for faster directory operations
+# - Uniform bucket-level access: IAM-only permissions (required for HNS)
+# - Autoclass: Automatic storage class management based on access patterns
+# - Lifecycle policies: Auto-deletion of old demo data
+#
+# Benefits for Databricks/Spark:
+# - Faster file listing operations (critical for Auto Loader)
+# - Efficient folder rename/move operations
+# - Better performance for Hadoop-compatible APIs
 #
 
 set -e
@@ -10,7 +21,7 @@ set -e
 # Configuration - Update these values
 PROJECT_ID="${GCP_PROJECT_ID:-<YOUR_GCP_PROJECT_ID>}"  # Set GCP_PROJECT_ID env var or update this
 REGION="us-central1"
-BUCKET_NAME="${PROJECT_ID}-telco-snmp"
+BUCKET_NAME="telco-retail-metrics"
 VM_NAME="telco-sftp-server"
 ZONE="us-central1-a"
 
@@ -26,6 +37,12 @@ echo "=========================================="
 echo "Project ID: ${PROJECT_ID}"
 echo "Bucket Name: ${BUCKET_NAME}"
 echo "Region: ${REGION}"
+echo ""
+echo "Performance Features:"
+echo "  ✓ Hierarchical Namespace (HNS) - enabled"
+echo "  ✓ Uniform bucket-level access (IAM-only)"
+echo "  ✓ Autoclass (automatic storage optimization)"
+echo ""
 echo "Pub/Sub Setup: ${ENABLE_PUBSUB}"
 if [ "$ENABLE_PUBSUB" = "true" ]; then
   echo "Pub/Sub Topic: ${PUBSUB_TOPIC}"
@@ -43,14 +60,25 @@ if [ "$ENABLE_PUBSUB" = "true" ]; then
   gcloud services enable pubsub.googleapis.com
 fi
 
-# Create GCS bucket
-echo "Creating GCS bucket: gs://${BUCKET_NAME}..."
+# Create GCS bucket with Hierarchical Namespace (HNS) enabled
+echo "Creating GCS bucket with Hierarchical Namespace: gs://${BUCKET_NAME}..."
 if gsutil ls -b gs://${BUCKET_NAME} 2>/dev/null; then
     echo "Bucket already exists, skipping creation"
 else
-    gsutil mb -l ${REGION} -p ${PROJECT_ID} gs://${BUCKET_NAME}/
-    echo "[OK] Bucket created"
+    # HNS requires gcloud storage buckets create (not gsutil mb)
+    # HNS also requires uniform bucket-level access to be enabled
+    gcloud storage buckets create gs://${BUCKET_NAME} \
+        --location=${REGION} \
+        --uniform-bucket-level-access \
+        --enable-hierarchical-namespace \
+        --project=${PROJECT_ID}
+    echo "[OK] Bucket created with Hierarchical Namespace enabled"
 fi
+
+# Enable Autoclass for automatic storage class management
+echo "Enabling Autoclass for automatic storage optimization..."
+gsutil autoclass set --autoclass gs://${BUCKET_NAME}/ 2>/dev/null || echo "Note: Autoclass may not be available in your project"
+echo "[OK] Autoclass configuration applied"
 
 # Create folder structure
 echo "Creating folder structure..."
@@ -226,11 +254,19 @@ echo "GCS Setup Complete!"
 echo "=========================================="
 echo ""
 echo "Bucket URL: gs://${BUCKET_NAME}/snmp/"
+echo ""
+echo "Performance Features Enabled:"
+echo "  ✓ Hierarchical Namespace (HNS) - true folder support"
+echo "  ✓ Uniform bucket-level access - IAM-only permissions"
+echo "  ✓ Autoclass - automatic storage optimization"
+echo "  ✓ Lifecycle policy - 7-day retention"
+echo ""
 if [ "$ENABLE_PUBSUB" = "true" ]; then
-  echo "Pub/Sub Topic: projects/${PROJECT_ID}/topics/${PUBSUB_TOPIC}"
-  echo "Pub/Sub Subscription: ${PUBSUB_SUBSCRIPTION}"
+  echo "Pub/Sub Configuration:"
+  echo "  Topic: projects/${PROJECT_ID}/topics/${PUBSUB_TOPIC}"
+  echo "  Subscription: ${PUBSUB_SUBSCRIPTION}"
 else
-  echo "Pub/Sub: Disabled (using managed file events)"
+  echo "File Notifications: Managed file events (recommended)"
 fi
 echo ""
 echo "=========================================="

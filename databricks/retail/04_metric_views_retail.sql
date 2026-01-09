@@ -193,6 +193,14 @@ AS $$
       expr: region
       comment: "Store region"
     
+    - name: Latitude
+      expr: latitude
+      comment: "Store latitude for geospatial visualization"
+    
+    - name: Longitude
+      expr: longitude
+      comment: "Store longitude for geospatial visualization"
+    
     - name: Health Status
       expr: health_status
       comment: "Health category: Excellent, Good, Fair, Poor, Critical"
@@ -552,6 +560,10 @@ AS $$
       expr: store_id
       comment: "Fast food store identifier"
     
+    - name: Store Category
+      expr: store_category
+      comment: "Store category (fast_food or apparel)"
+    
     - name: Store Type
       expr: store_type
       comment: "Type of fast food store"
@@ -641,20 +653,12 @@ AS $$
       comment: "Number of stores"
     
     - name: Avg Order Value
-      expr: AVG(order_value)
+      expr: AVG(avg_order_value_context)
       comment: "Average order dollar amount (for normalization analysis)"
     
     - name: Avg Item Count
-      expr: AVG(item_count)
+      expr: AVG(avg_item_count_context)
       comment: "Average items per order (for complexity analysis)"
-    
-    - name: Benchmark Gap (sec)
-      expr: AVG(avg_value) - AVG(benchmark_value)
-      comment: "Gap from industry benchmark (positive = worse than benchmark)"
-    
-    - name: Benchmark Compliance Rate
-      expr: SUM(CASE WHEN avg_value <= benchmark_value THEN 1 ELSE 0 END) / NULLIF(COUNT(*), 0) * 100
-      comment: "Percentage of samples meeting industry benchmark"
 $$;
 
 -- COMMAND ----------
@@ -666,11 +670,8 @@ SELECT
   MEASURE(`Store Count`),
   MEASURE(`Average Value`) as avg_otd_seconds,
   MEASURE(`P95 Value`) as p95_otd_seconds,
-  MEASURE(`Benchmark Gap (sec)`) as gap_from_benchmark,
   MEASURE(`Anomaly Rate`) as anomaly_pct
 FROM retail_analytics.metrics.mv_hme_speed_of_service
-WHERE `Metric Name` = 'drive_through_total_experience_time_sec'
-  AND `Store Category` = 'fast_food'
 GROUP BY `Time Period`, `Brand`
 ORDER BY MEASURE(`Average Value`) DESC
 LIMIT 10;
@@ -747,9 +748,9 @@ AS $$
       expr: region
       comment: "Store region"
     
-    - name: Brand
-      expr: brand
-      comment: "Fast food brand"
+    - name: Store Category
+      expr: store_category
+      comment: "Store category (apparel or fast_food)"
     
     - name: Event Type
       expr: event_type
@@ -922,6 +923,10 @@ AS $$
       expr: store_id
       comment: "Fast food store identifier"
     
+    - name: Store Category
+      expr: store_category
+      comment: "Store category (fast_food or apparel)"
+    
     - name: Region
       expr: region
       comment: "Store region"
@@ -936,9 +941,9 @@ AS $$
     
     - name: Order Size Category
       expr: CASE
-              WHEN order_value < 15 THEN 'Small ($8-15)'
-              WHEN order_value < 30 THEN 'Medium ($15-30)'
-              WHEN order_value < 50 THEN 'Large ($30-50)'
+              WHEN avg_order_value_context < 15 THEN 'Small ($8-15)'
+              WHEN avg_order_value_context < 30 THEN 'Medium ($15-30)'
+              WHEN avg_order_value_context < 50 THEN 'Large ($30-50)'
               ELSE 'Mega ($50+)'
             END
       comment: "Order complexity category based on dollar value"
@@ -965,11 +970,11 @@ AS $$
       comment: "95th percentile timing"
     
     - name: Average Order Value
-      expr: AVG(order_value)
+      expr: AVG(avg_order_value_context)
       comment: "Average order dollar amount"
     
     - name: Average Item Count
-      expr: AVG(item_count)
+      expr: AVG(avg_item_count_context)
       comment: "Average items per order"
     
     - name: Total Orders

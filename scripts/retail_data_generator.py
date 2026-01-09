@@ -1139,7 +1139,7 @@ class RetailDataGenerator:
         timestamp_str = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S_%f")[:-3]
         filename = self.events_dir / f"events_{timestamp_str}_{file_count:06d}.txt"
         
-        num_entries = random.randint(10, 50)
+        num_entries = random.randint(1000, 2500)
         current_time = datetime.now(timezone.utc)
         
         try:
@@ -1173,7 +1173,7 @@ class RetailDataGenerator:
         """Write a store metrics file"""
         timestamp_str = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S_%f")[:-3]
         
-        num_entries = random.randint(20, 100)
+        num_entries = random.randint(2000, 2500)
         records = []
         
         for _ in range(num_entries):
