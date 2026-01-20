@@ -399,7 +399,7 @@ class TelcoDataGenerator:
         filename = self.syslog_dir / f"syslog_{timestamp_str}_{file_count:06d}.txt"
         
         # Generate 10-50 log entries per file
-        num_entries = random.randint(10, 50)
+        num_entries = random.randint(1000, 2500)
         
         try:
             with open(filename, 'w') as f:
