@@ -23,6 +23,12 @@ from io import BytesIO
 from pathlib import Path
 from typing import List, Optional
 
+try:
+    from google.cloud import pubsub_v1
+    PUBSUB_AVAILABLE = True
+except ImportError:
+    PUBSUB_AVAILABLE = False
+
 # Configuration
 DEVICE_TYPES = ["router", "switch", "firewall", "load_balancer"]
 LOCATIONS = ["datacenter-east", "datacenter-west", "datacenter-central", "edge-north", "edge-south"]
@@ -72,6 +78,59 @@ class NetworkDevice:
     vendor: str
     model: str
     ip_address: str
+
+
+class PubSubPublisher:
+    """Publishes syslog events to Pub/Sub with async batch publishing"""
+    
+    def __init__(self, project_id: str, topic_name: str):
+        if not PUBSUB_AVAILABLE:
+            raise ImportError(
+                "google-cloud-pubsub is required for Pub/Sub support. "
+                "Install with: pip install google-cloud-pubsub"
+            )
+        # Configure batch settings for high throughput
+        batch_settings = pubsub_v1.types.BatchSettings(
+            max_messages=1000,  # Max messages per batch
+            max_bytes=10 * 1024 * 1024,  # 10 MB max per batch
+            max_latency=0.01,  # 10ms max latency
+        )
+        self.publisher = pubsub_v1.PublisherClient(batch_settings=batch_settings)
+        self.topic_path = self.publisher.topic_path(project_id, topic_name)
+        self.logger = logging.getLogger(__name__)
+        self.pending_futures = []
+        self.logger.info(f"Pub/Sub publisher initialized: {self.topic_path}")
+    
+    def publish(self, message: str):
+        """Publish a message to Pub/Sub asynchronously"""
+        try:
+            # Publish without blocking - let the client batch automatically
+            future = self.publisher.publish(
+                self.topic_path,
+                message.encode('utf-8')
+            )
+            # Add callback for error handling only
+            future.add_done_callback(self._publish_callback)
+            self.pending_futures.append(future)
+        except Exception as e:
+            self.logger.error(f"Failed to publish to Pub/Sub: {e}")
+    
+    def _publish_callback(self, future):
+        """Callback to handle publish errors"""
+        try:
+            future.result()
+        except Exception as e:
+            self.logger.error(f"Publish failed: {e}")
+    
+    def flush(self):
+        """Wait for all pending messages to be published"""
+        if self.pending_futures:
+            for future in self.pending_futures:
+                try:
+                    future.result(timeout=10)
+                except Exception as e:
+                    self.logger.error(f"Error flushing message: {e}")
+            self.pending_futures.clear()
 
 
 class GCSClient:
@@ -145,36 +204,45 @@ class TelcoDataGenerator:
     
     def __init__(
         self,
-        syslog_dir: str,
+        syslog_dir: Optional[str],
         snmp_dir: Optional[str],
         snmp_gcs_bucket: Optional[str],
         files_per_minute: int,
-        extended_schema: bool = False
+        extended_schema: bool = False,
+        syslog_pubsub_topic: Optional[str] = None,
+        project_id: Optional[str] = None
     ):
-        self.syslog_dir = Path(syslog_dir)
+        self.syslog_dir = Path(syslog_dir) if syslog_dir else None
         self.snmp_dir = Path(snmp_dir) if snmp_dir else None
         self.snmp_gcs_client = GCSClient(snmp_gcs_bucket) if snmp_gcs_bucket else None
         self.files_per_minute = files_per_minute
         self.extended_schema = extended_schema
         self.devices = self._generate_devices()
         
-        # Determine SNMP output mode
-        self.snmp_output_mode = "gcs" if snmp_gcs_bucket else "local"
+        # Initialize Pub/Sub publisher for syslog if topic provided
+        self.syslog_pubsub = None
+        if syslog_pubsub_topic and project_id:
+            self.syslog_pubsub = PubSubPublisher(project_id, syslog_pubsub_topic)
         
-        # Ensure directories exist
-        self.syslog_dir.mkdir(parents=True, exist_ok=True)
+        # Determine output modes
+        self.snmp_output_mode = "gcs" if snmp_gcs_bucket else "local"
+        self.syslog_output_mode = "pubsub" if self.syslog_pubsub else "local"
+        
+        # Ensure directories exist if using local mode
+        if self.syslog_dir:
+            self.syslog_dir.mkdir(parents=True, exist_ok=True)
         if self.snmp_dir:
             self.snmp_dir.mkdir(parents=True, exist_ok=True)
         
-        # Calculate timing
-        self.syslog_files_per_min = files_per_minute // 2
-        self.snmp_files_per_min = files_per_minute // 2
+        # Calculate timing - 60/40 split (60% syslog, 40% SNMP)
+        self.syslog_files_per_min = int(files_per_minute * 0.6)  # 60% for syslog
+        self.snmp_files_per_min = int(files_per_minute * 0.4)    # 40% for SNMP
         self.syslog_interval = 60.0 / self.syslog_files_per_min if self.syslog_files_per_min > 0 else 1.0
         self.snmp_interval = 60.0 / self.snmp_files_per_min if self.snmp_files_per_min > 0 else 1.0
         
-        logging.info(f"Initialized generator: {files_per_minute} files/min")
-        logging.info(f"Syslog: {self.syslog_files_per_min} files/min (interval: {self.syslog_interval:.3f}s) -> local")
-        logging.info(f"SNMP: {self.snmp_files_per_min} files/min (interval: {self.snmp_interval:.3f}s) -> {self.snmp_output_mode}")
+        logging.info(f"Initialized generator: {files_per_minute} batches/min")
+        logging.info(f"Syslog: {self.syslog_files_per_min} batches/min (interval: {self.syslog_interval:.3f}s) -> {self.syslog_output_mode}")
+        logging.info(f"SNMP: {self.snmp_files_per_min} batches/min (interval: {self.snmp_interval:.3f}s) -> {self.snmp_output_mode}")
         logging.info(f"Extended schema: {self.extended_schema}")
         logging.info(f"Generated {len(self.devices)} network devices")
     
@@ -393,31 +461,45 @@ class TelcoDataGenerator:
         
         return record
     
-    def write_syslog_file(self, file_count: int):
-        """Write a syslog file with multiple log entries"""
-        timestamp_str = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S_%f")[:-3]
-        filename = self.syslog_dir / f"syslog_{timestamp_str}_{file_count:06d}.txt"
-        
-        # Generate 10-50 log entries per file
-        num_entries = random.randint(1000, 2500)
+    def write_syslog_batch(self, batch_count: int):
+        """Write syslog batch to Pub/Sub or file"""
+        # Generate 1000-5000 log entries per batch for very high volume
+        num_entries = random.randint(1000, 5000)
         
         try:
-            with open(filename, 'w') as f:
+            if self.syslog_pubsub:
+                # Publish to Pub/Sub asynchronously
                 for _ in range(num_entries):
                     device = random.choice(self.devices)
                     log_entry = self.generate_rfc5424_syslog(device)
-                    f.write(log_entry + "\n")
-            
-            logging.debug(f"Created syslog file: {filename} ({num_entries} entries)")
+                    self.syslog_pubsub.publish(log_entry)
+                
+                logging.debug(f"Published batch {batch_count} to Pub/Sub ({num_entries} messages queued)")
+                
+                # Periodic flush every 100 batches to ensure delivery
+                if batch_count % 100 == 0:
+                    self.syslog_pubsub.flush()
+            else:
+                # Write to file (existing behavior)
+                timestamp_str = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S_%f")[:-3]
+                filename = self.syslog_dir / f"syslog_{timestamp_str}_{batch_count:06d}.txt"
+                
+                with open(filename, 'w') as f:
+                    for _ in range(num_entries):
+                        device = random.choice(self.devices)
+                        log_entry = self.generate_rfc5424_syslog(device)
+                        f.write(log_entry + "\n")
+                
+                logging.debug(f"Created syslog file: {filename} ({num_entries} entries)")
         except Exception as e:
-            logging.error(f"Error writing syslog file {filename}: {e}")
+            logging.error(f"Error writing syslog batch {batch_count}: {e}")
     
     def write_snmp_file(self, file_count: int):
         """Write an SNMP metrics file (JSON to GCS or CSV to local)"""
         timestamp_str = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S_%f")[:-3]
         
-        # Generate 20-100 metric samples per file
-        num_entries = random.randint(20, 100)
+        # Generate 500-2000 metric samples per file (fewer files, more records each)
+        num_entries = random.randint(500, 2000)
         records = []
         
         for _ in range(num_entries):
@@ -447,7 +529,11 @@ class TelcoDataGenerator:
     def run(self):
         """Main generation loop"""
         logging.info("Starting data generation...")
-        logging.info(f"Syslog directory: {self.syslog_dir}")
+        if self.syslog_pubsub:
+            logging.info(f"Syslog destination: Pub/Sub")
+        else:
+            logging.info(f"Syslog directory: {self.syslog_dir}")
+        
         if self.snmp_gcs_client:
             logging.info(f"SNMP destination: GCS (gs://{self.snmp_gcs_client.bucket_name}/{self.snmp_gcs_client.prefix})")
         else:
@@ -463,9 +549,9 @@ class TelcoDataGenerator:
             while not shutdown_flag:
                 current_time = time.time()
                 
-                # Generate syslog file if interval has passed
+                # Generate syslog batch if interval has passed
                 if current_time - last_syslog_time >= self.syslog_interval:
-                    self.write_syslog_file(syslog_count)
+                    self.write_syslog_batch(syslog_count)
                     syslog_count += 1
                     last_syslog_time = current_time
                 
@@ -475,10 +561,10 @@ class TelcoDataGenerator:
                     snmp_count += 1
                     last_snmp_time = current_time
                 
-                # Log progress every 100 files
-                total_files = syslog_count + snmp_count
-                if total_files > 0 and total_files % 100 == 0:
-                    logging.info(f"Generated {total_files} files (syslog: {syslog_count}, snmp: {snmp_count})")
+                # Log progress every 100 batches
+                total_batches = syslog_count + snmp_count
+                if total_batches > 0 and total_batches % 100 == 0:
+                    logging.info(f"Generated {total_batches} batches (syslog: {syslog_count}, snmp: {snmp_count})")
                 
                 # Small sleep to prevent busy waiting
                 time.sleep(0.001)
@@ -486,9 +572,14 @@ class TelcoDataGenerator:
         except KeyboardInterrupt:
             logging.info("Received interrupt signal")
         finally:
-            logging.info(f"Shutting down. Total files generated: {syslog_count + snmp_count}")
-            logging.info(f"  Syslog files: {syslog_count}")
-            logging.info(f"  SNMP files: {snmp_count}")
+            # Flush any pending Pub/Sub messages
+            if self.syslog_pubsub:
+                logging.info("Flushing pending Pub/Sub messages...")
+                self.syslog_pubsub.flush()
+            
+            logging.info(f"Shutting down. Total batches generated: {syslog_count + snmp_count}")
+            logging.info(f"  Syslog batches: {syslog_count}")
+            logging.info(f"  SNMP batches: {snmp_count}")
 
 
 def signal_handler(signum, frame):
@@ -506,8 +597,20 @@ def main():
     parser.add_argument(
         "--syslog-dir",
         type=str,
-        default="/sftp/telco/syslog",
-        help="Directory for syslog files (default: /sftp/telco/syslog)"
+        default=None,
+        help="Directory for syslog files (local mode, default: /sftp/telco/syslog)"
+    )
+    parser.add_argument(
+        "--syslog-pubsub-topic",
+        type=str,
+        default=None,
+        help="Pub/Sub topic name for syslog events (e.g., syslog-events)"
+    )
+    parser.add_argument(
+        "--project-id",
+        type=str,
+        default=None,
+        help="GCP Project ID (required for Pub/Sub mode)"
     )
     parser.add_argument(
         "--snmp-dir",
@@ -524,8 +627,8 @@ def main():
     parser.add_argument(
         "--files-per-minute",
         type=int,
-        default=1000,
-        help="Total files to generate per minute (split between syslog and SNMP) (default: 1000)"
+        default=100,
+        help="Total batches to generate per minute (split between syslog and SNMP) (default: 100)"
     )
     parser.add_argument(
         "--extended-schema",
@@ -541,6 +644,17 @@ def main():
     )
     
     args = parser.parse_args()
+    
+    # Validate syslog output configuration
+    if args.syslog_pubsub_topic and not args.project_id:
+        parser.error("--project-id is required when using --syslog-pubsub-topic")
+    
+    if not args.syslog_pubsub_topic and not args.syslog_dir:
+        args.syslog_dir = "/sftp/telco/syslog"  # Default to local
+    
+    if args.syslog_pubsub_topic and args.syslog_dir:
+        logging.warning("Both --syslog-pubsub-topic and --syslog-dir specified. Using Pub/Sub.")
+        args.syslog_dir = None
     
     # Validate SNMP output configuration
     if not args.snmp_gcs_bucket and not args.snmp_dir:
@@ -569,7 +683,9 @@ def main():
         snmp_dir=args.snmp_dir,
         snmp_gcs_bucket=args.snmp_gcs_bucket,
         files_per_minute=args.files_per_minute,
-        extended_schema=args.extended_schema
+        extended_schema=args.extended_schema,
+        syslog_pubsub_topic=args.syslog_pubsub_topic,
+        project_id=args.project_id
     )
     
     generator.run()

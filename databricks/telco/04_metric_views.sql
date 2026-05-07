@@ -27,10 +27,10 @@
 
 -- COMMAND ----------
 
-USE CATALOG telus_networkperf;
+USE CATALOG telco_networkperf;
 
 -- Create metrics schema if not exists
-CREATE SCHEMA IF NOT EXISTS telus_networkperf.metrics
+CREATE SCHEMA IF NOT EXISTS telco_networkperf.metrics
 COMMENT 'Unity Catalog Metric Views for network KPI monitoring';
 
 USE SCHEMA metrics;
@@ -44,13 +44,13 @@ USE SCHEMA metrics;
 
 -- COMMAND ----------
 
-CREATE OR REPLACE VIEW telus_networkperf.metrics.mv_network_performance
+CREATE OR REPLACE VIEW telco_networkperf.metrics.mv_network_performance
 WITH METRICS
 LANGUAGE YAML
 AS $$
   version: 1.1
   comment: "Network performance KPIs from SNMP metrics - latency, packet loss, throughput, jitter, error rate"
-  source: telus_networkperf.gold.gold_network_performance_5min
+  source: telco_networkperf.gold.gold_network_performance_5min
   
   dimensions:
     - name: Time Window Start
@@ -137,7 +137,7 @@ SELECT
   MEASURE(`Device Count`),
   `Metric Name`,
   `Location`
-FROM telus_networkperf.metrics.mv_network_performance
+FROM telco_networkperf.metrics.mv_network_performance
 WHERE `Metric Name` = 'latency_ms'
 GROUP BY `Metric Name`, `Location`
 ORDER BY MEASURE(`Average Value`) DESC
@@ -152,13 +152,13 @@ LIMIT 10;
 
 -- COMMAND ----------
 
-CREATE OR REPLACE VIEW telus_networkperf.metrics.mv_device_health
+CREATE OR REPLACE VIEW telco_networkperf.metrics.mv_device_health
 WITH METRICS
 LANGUAGE YAML
 AS $$
   version: 1.1
   comment: "Device health scores and current performance metrics for network monitoring"
-  source: telus_networkperf.gold.gold_device_health
+  source: telco_networkperf.gold.gold_device_health
   
   dimensions:
     - name: Device ID
@@ -240,7 +240,7 @@ SELECT
   MEASURE(`Average Health Score`),
   MEASURE(`Critical Events (1h)`),
   MEASURE(`Devices Needing Attention`)
-FROM telus_networkperf.metrics.mv_device_health
+FROM telco_networkperf.metrics.mv_device_health
 GROUP BY `Health Status`
 ORDER BY MEASURE(`Average Health Score`) ASC;
 
@@ -253,13 +253,13 @@ ORDER BY MEASURE(`Average Health Score`) ASC;
 
 -- COMMAND ----------
 
-CREATE OR REPLACE VIEW telus_networkperf.metrics.mv_network_events
+CREATE OR REPLACE VIEW telco_networkperf.metrics.mv_network_events
 WITH METRICS
 LANGUAGE YAML
 AS $$
   version: 1.1
   comment: "Network event metrics from syslog data for incident analysis"
-  source: telus_networkperf.gold.gold_network_events
+  source: telco_networkperf.gold.gold_network_events
   
   dimensions:
     - name: Event Timestamp
@@ -337,7 +337,7 @@ SELECT
   MEASURE(`Event Count`),
   MEASURE(`Critical Event Count`),
   MEASURE(`Affected Device Count`)
-FROM telus_networkperf.metrics.mv_network_events
+FROM telco_networkperf.metrics.mv_network_events
 GROUP BY `Event Category`, `Severity Name`
 ORDER BY MEASURE(`Event Count`) DESC
 LIMIT 15;
@@ -351,13 +351,13 @@ LIMIT 15;
 
 -- COMMAND ----------
 
-CREATE OR REPLACE VIEW telus_networkperf.metrics.mv_geographic_performance
+CREATE OR REPLACE VIEW telco_networkperf.metrics.mv_geographic_performance
 WITH METRICS
 LANGUAGE YAML
 AS $$
   version: 1.1
   comment: "Network performance metrics aggregated by geographic location"
-  source: telus_networkperf.gold.gold_metrics_by_location
+  source: telco_networkperf.gold.gold_metrics_by_location
   
   dimensions:
     - name: Time Window Start
@@ -424,7 +424,7 @@ SELECT
   MEASURE(`Average Value`),
   MEASURE(`Total Anomalies`),
   MEASURE(`Anomaly Rate`)
-FROM telus_networkperf.metrics.mv_geographic_performance
+FROM telco_networkperf.metrics.mv_geographic_performance
 GROUP BY `Location`, `Metric Name`
 ORDER BY `Location`, `Metric Name`;
 
@@ -437,13 +437,13 @@ ORDER BY `Location`, `Metric Name`;
 
 -- COMMAND ----------
 
-CREATE OR REPLACE VIEW telus_networkperf.metrics.mv_kpi_dashboard
+CREATE OR REPLACE VIEW telco_networkperf.metrics.mv_kpi_dashboard
 WITH METRICS
 LANGUAGE YAML
 AS $$
   version: 1.1
   comment: "Hourly KPI summary metrics for executive dashboards and reporting"
-  source: telus_networkperf.gold.gold_kpi_hourly
+  source: telco_networkperf.gold.gold_kpi_hourly
   
   dimensions:
     - name: Hour
@@ -497,7 +497,7 @@ SELECT
   MEASURE(`Hourly Max`),
   MEASURE(`Total Anomalies`),
   MEASURE(`Critical Events`)
-FROM telus_networkperf.metrics.mv_kpi_dashboard
+FROM telco_networkperf.metrics.mv_kpi_dashboard
 GROUP BY `Metric Name`
 ORDER BY `Metric Name`;
 
@@ -509,7 +509,7 @@ ORDER BY `Metric Name`;
 -- COMMAND ----------
 
 -- Show all metric views created
-SHOW VIEWS IN telus_networkperf.metrics;
+SHOW VIEWS IN telco_networkperf.metrics;
 
 -- COMMAND ----------
 
@@ -519,7 +519,7 @@ SHOW VIEWS IN telus_networkperf.metrics;
 -- COMMAND ----------
 
 -- Get full YAML definition for a metric view
-DESCRIBE TABLE EXTENDED telus_networkperf.metrics.mv_network_performance AS JSON;
+DESCRIBE TABLE EXTENDED telco_networkperf.metrics.mv_network_performance AS JSON;
 
 -- COMMAND ----------
 
@@ -542,7 +542,7 @@ DESCRIBE TABLE EXTENDED telus_networkperf.metrics.mv_network_performance AS JSON
 -- MAGIC   `Location`,
 -- MAGIC   MEASURE(`Average Value`),
 -- MAGIC   MEASURE(`P95 Value`)
--- MAGIC FROM telus_networkperf.metrics.mv_network_performance
+-- MAGIC FROM telco_networkperf.metrics.mv_network_performance
 -- MAGIC WHERE `Metric Name` = 'latency_ms'
 -- MAGIC GROUP BY `Location`;
 -- MAGIC ```
@@ -553,7 +553,7 @@ DESCRIBE TABLE EXTENDED telus_networkperf.metrics.mv_network_performance AS JSON
 -- MAGIC   `Health Status`,
 -- MAGIC   MEASURE(`Device Count`),
 -- MAGIC   MEASURE(`Average Health Score`)
--- MAGIC FROM telus_networkperf.metrics.mv_device_health
+-- MAGIC FROM telco_networkperf.metrics.mv_device_health
 -- MAGIC GROUP BY `Health Status`;
 -- MAGIC ```
 -- MAGIC 
@@ -563,7 +563,7 @@ DESCRIBE TABLE EXTENDED telus_networkperf.metrics.mv_network_performance AS JSON
 -- MAGIC   `Event Category`,
 -- MAGIC   MEASURE(`Critical Event Count`),
 -- MAGIC   MEASURE(`Critical Event Rate`)
--- MAGIC FROM telus_networkperf.metrics.mv_network_events
+-- MAGIC FROM telco_networkperf.metrics.mv_network_events
 -- MAGIC WHERE `Is Critical` = 'Critical'
 -- MAGIC GROUP BY `Event Category`;
 -- MAGIC ```

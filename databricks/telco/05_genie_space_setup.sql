@@ -26,21 +26,21 @@
 -- MAGIC 
 -- MAGIC | Table | Description | Key Use Cases |
 -- MAGIC |-------|-------------|---------------|
--- MAGIC | `telus_networkperf.gold.gold_network_performance_5min` | 5-minute aggregated SNMP metrics | Latency trends, throughput analysis, anomaly detection |
--- MAGIC | `telus_networkperf.gold.gold_device_health` | Current device health scores | Device monitoring, health dashboards, alerts |
--- MAGIC | `telus_networkperf.gold.gold_network_events` | Parsed syslog events | Incident analysis, security monitoring |
--- MAGIC | `telus_networkperf.gold.gold_metrics_by_location` | Location-aggregated metrics | Geographic performance comparison |
--- MAGIC | `telus_networkperf.gold.gold_kpi_hourly` | Hourly KPI summaries | Executive reporting, trend analysis |
+-- MAGIC | `telco_networkperf.gold.gold_network_performance_5min` | 5-minute aggregated SNMP metrics | Latency trends, throughput analysis, anomaly detection |
+-- MAGIC | `telco_networkperf.gold.gold_device_health` | Current device health scores | Device monitoring, health dashboards, alerts |
+-- MAGIC | `telco_networkperf.gold.gold_network_events` | Parsed syslog events | Incident analysis, security monitoring |
+-- MAGIC | `telco_networkperf.gold.gold_metrics_by_location` | Location-aggregated metrics | Geographic performance comparison |
+-- MAGIC | `telco_networkperf.gold.gold_kpi_hourly` | Hourly KPI summaries | Executive reporting, trend analysis |
 -- MAGIC 
 -- MAGIC ## Metric Views (Add these to the Genie Space)
 -- MAGIC 
 -- MAGIC | Metric View | Description | Key Measures |
 -- MAGIC |-------------|-------------|--------------|
--- MAGIC | `telus_networkperf.metrics.mv_network_performance` | SNMP performance metrics | Avg/Max/P95 values, Anomaly rates |
--- MAGIC | `telus_networkperf.metrics.mv_device_health` | Device health metrics | Health scores, Critical device counts |
--- MAGIC | `telus_networkperf.metrics.mv_network_events` | Event analysis metrics | Event counts, Critical event rates |
--- MAGIC | `telus_networkperf.metrics.mv_geographic_performance` | Location-based metrics | Regional comparisons |
--- MAGIC | `telus_networkperf.metrics.mv_kpi_dashboard` | Dashboard KPIs | Hourly summaries |
+-- MAGIC | `telco_networkperf.metrics.mv_network_performance` | SNMP performance metrics | Avg/Max/P95 values, Anomaly rates |
+-- MAGIC | `telco_networkperf.metrics.mv_device_health` | Device health metrics | Health scores, Critical device counts |
+-- MAGIC | `telco_networkperf.metrics.mv_network_events` | Event analysis metrics | Event counts, Critical event rates |
+-- MAGIC | `telco_networkperf.metrics.mv_geographic_performance` | Location-based metrics | Regional comparisons |
+-- MAGIC | `telco_networkperf.metrics.mv_kpi_dashboard` | Dashboard KPIs | Hourly summaries |
 
 -- COMMAND ----------
 
@@ -408,21 +408,21 @@
 -- MAGIC 2. **Description**: `AI-powered analytics for real-time network performance monitoring, device health, and incident analysis.`
 -- MAGIC 
 -- MAGIC ## Step 3: Add Data Assets
--- MAGIC Click **"Add tables"** and add these tables from `telus_networkperf`:
+-- MAGIC Click **"Add tables"** and add these tables from `telco_networkperf`:
 -- MAGIC 
 -- MAGIC **Gold Tables:**
--- MAGIC - `telus_networkperf.gold.gold_network_performance_5min`
--- MAGIC - `telus_networkperf.gold.gold_device_health`
--- MAGIC - `telus_networkperf.gold.gold_network_events`
--- MAGIC - `telus_networkperf.gold.gold_metrics_by_location`
--- MAGIC - `telus_networkperf.gold.gold_kpi_hourly`
+-- MAGIC - `telco_networkperf.gold.gold_network_performance_5min`
+-- MAGIC - `telco_networkperf.gold.gold_device_health`
+-- MAGIC - `telco_networkperf.gold.gold_network_events`
+-- MAGIC - `telco_networkperf.gold.gold_metrics_by_location`
+-- MAGIC - `telco_networkperf.gold.gold_kpi_hourly`
 -- MAGIC 
 -- MAGIC **Metric Views:**
--- MAGIC - `telus_networkperf.metrics.mv_network_performance`
--- MAGIC - `telus_networkperf.metrics.mv_device_health`
--- MAGIC - `telus_networkperf.metrics.mv_network_events`
--- MAGIC - `telus_networkperf.metrics.mv_geographic_performance`
--- MAGIC - `telus_networkperf.metrics.mv_kpi_dashboard`
+-- MAGIC - `telco_networkperf.metrics.mv_network_performance`
+-- MAGIC - `telco_networkperf.metrics.mv_device_health`
+-- MAGIC - `telco_networkperf.metrics.mv_network_events`
+-- MAGIC - `telco_networkperf.metrics.mv_geographic_performance`
+-- MAGIC - `telco_networkperf.metrics.mv_kpi_dashboard`
 -- MAGIC 
 -- MAGIC ## Step 4: Configure General Instructions
 -- MAGIC Click the **gear icon** → **"General instructions"**
@@ -464,20 +464,20 @@
 -- COMMAND ----------
 
 -- Check gold tables exist and have data
-SELECT 'gold_network_performance_5min' as table_name, COUNT(*) as row_count FROM telus_networkperf.gold.gold_network_performance_5min
+SELECT 'gold_network_performance_5min' as table_name, COUNT(*) as row_count FROM telco_networkperf.gold.gold_network_performance_5min
 UNION ALL
-SELECT 'gold_device_health', COUNT(*) FROM telus_networkperf.gold.gold_device_health
+SELECT 'gold_device_health', COUNT(*) FROM telco_networkperf.gold.gold_device_health
 UNION ALL
-SELECT 'gold_network_events', COUNT(*) FROM telus_networkperf.gold.gold_network_events
+SELECT 'gold_network_events', COUNT(*) FROM telco_networkperf.gold.gold_network_events
 UNION ALL
-SELECT 'gold_metrics_by_location', COUNT(*) FROM telus_networkperf.gold.gold_metrics_by_location
+SELECT 'gold_metrics_by_location', COUNT(*) FROM telco_networkperf.gold.gold_metrics_by_location
 UNION ALL
-SELECT 'gold_kpi_hourly', COUNT(*) FROM telus_networkperf.gold.gold_kpi_hourly;
+SELECT 'gold_kpi_hourly', COUNT(*) FROM telco_networkperf.gold.gold_kpi_hourly;
 
 -- COMMAND ----------
 
 -- Check metric views exist
-SHOW VIEWS IN telus_networkperf.metrics;
+SHOW VIEWS IN telco_networkperf.metrics;
 
 -- COMMAND ----------
 
@@ -487,7 +487,7 @@ SELECT
   MEASURE(`Average Value`) as avg_latency,
   MEASURE(`P95 Value`) as p95_latency,
   MEASURE(`Anomaly Rate`) as anomaly_pct
-FROM telus_networkperf.metrics.mv_network_performance
+FROM telco_networkperf.metrics.mv_network_performance
 WHERE `Metric Name` = 'latency_ms'
 GROUP BY `Location`
 ORDER BY avg_latency DESC;
@@ -500,7 +500,7 @@ SELECT
   MEASURE(`Device Count`) as devices,
   MEASURE(`Average Health Score`) as avg_score,
   MEASURE(`Devices Needing Attention`) as needs_attention
-FROM telus_networkperf.metrics.mv_device_health
+FROM telco_networkperf.metrics.mv_device_health
 GROUP BY `Health Status`
 ORDER BY avg_score ASC;
 

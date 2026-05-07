@@ -656,10 +656,10 @@ LIMIT 20
 # MAGIC     p.avg_value as network_latency_ms,
 # MAGIC     p.anomaly_count as network_anomalies
 # MAGIC FROM aws_ims_shared.ims_data.ims_volte_cdrs c
-# MAGIC JOIN telus_networkperf.gold.dim_devices d 
+# MAGIC JOIN telco_networkperf.gold.dim_devices d 
 # MAGIC     ON c.originating_device_id = d.device_id 
 # MAGIC     AND c.originating_location = d.location
-# MAGIC LEFT JOIN telus_networkperf.gold.gold_network_performance_5min p
+# MAGIC LEFT JOIN telco_networkperf.gold.gold_network_performance_5min p
 # MAGIC     ON c.originating_device_id = p.device_id
 # MAGIC     AND p.metric_name = 'latency_ms'
 # MAGIC     AND p.window_start <= c.call_start_time

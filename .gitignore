@@ -37,6 +37,10 @@ env/
 
 # Databricks
 .databricks/
+.databricks-resources.json
+
+# Claude Code session files
+.claude/
 
 # Logs
 *.log

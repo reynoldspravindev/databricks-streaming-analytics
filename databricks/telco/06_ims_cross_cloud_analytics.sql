@@ -103,10 +103,10 @@ SELECT
     c.originating_location,
     c.originating_region
 FROM aws_ims_shared.ims_data.ims_volte_cdrs c
-INNER JOIN telus_networkperf.gold.dim_devices d 
+INNER JOIN telco_networkperf.gold.dim_devices d 
     ON c.originating_device_id = d.device_id 
     AND c.originating_location = d.location
-LEFT JOIN telus_networkperf.gold.gold_device_health h 
+LEFT JOIN telco_networkperf.gold.gold_device_health h 
     ON d.device_id = h.device_id;
 
 -- View the correlation
@@ -142,7 +142,7 @@ ORDER BY device_health_status, vendor;
 
 -- COMMAND ----------
 
-CREATE OR REPLACE TABLE telus_networkperf.gold.gold_ims_call_quality_analysis
+CREATE OR REPLACE TABLE telco_networkperf.gold.gold_ims_call_quality_analysis
 COMMENT 'Cross-cloud analysis of IMS call quality correlated with network device performance'
 TBLPROPERTIES (
     'quality' = 'gold',
@@ -173,10 +173,10 @@ WITH call_metrics AS (
         h.critical_event_count_1h
         
     FROM aws_ims_shared.ims_data.ims_volte_cdrs c
-    INNER JOIN telus_networkperf.gold.dim_devices d 
+    INNER JOIN telco_networkperf.gold.dim_devices d 
         ON c.originating_device_id = d.device_id 
         AND c.originating_location = d.location
-    LEFT JOIN telus_networkperf.gold.gold_device_health h 
+    LEFT JOIN telco_networkperf.gold.gold_device_health h 
         ON d.device_id = h.device_id
 )
 SELECT 
@@ -217,7 +217,7 @@ GROUP BY
 -- COMMAND ----------
 
 -- Preview the analysis table
-SELECT * FROM telus_networkperf.gold.gold_ims_call_quality_analysis
+SELECT * FROM telco_networkperf.gold.gold_ims_call_quality_analysis
 ORDER BY hour_start DESC, total_calls DESC
 LIMIT 20;
 
@@ -252,7 +252,7 @@ SELECT
     s.location,
     s.region
 FROM aws_ims_shared.ims_data.ims_sip_sessions s
-LEFT JOIN telus_networkperf.gold.gold_network_events e
+LEFT JOIN telco_networkperf.gold.gold_network_events e
     ON s.device_id = e.device_id
     AND TO_TIMESTAMP(s.session_start_time) BETWEEN 
         e.event_timestamp - INTERVAL 5 MINUTES 
@@ -285,7 +285,7 @@ LIMIT 20;
 
 -- COMMAND ----------
 
-CREATE OR REPLACE VIEW telus_networkperf.gold.v_regional_ims_network_kpis AS
+CREATE OR REPLACE VIEW telco_networkperf.gold.v_regional_ims_network_kpis AS
 SELECT 
     q.region,
     q.hour_start,
@@ -310,14 +310,14 @@ SELECT
         ELSE 'Poor'
     END AS combined_health_status
 
-FROM telus_networkperf.gold.gold_ims_call_quality_analysis q
-LEFT JOIN telus_networkperf.gold.gold_metrics_by_location n
+FROM telco_networkperf.gold.gold_ims_call_quality_analysis q
+LEFT JOIN telco_networkperf.gold.gold_metrics_by_location n
     ON q.region = n.location
     AND q.hour_start = n.window_start
     AND n.metric_name = 'latency_ms';
 
 -- Preview regional KPIs
-SELECT * FROM telus_networkperf.gold.v_regional_ims_network_kpis
+SELECT * FROM telco_networkperf.gold.v_regional_ims_network_kpis
 WHERE hour_start >= current_timestamp() - INTERVAL 24 HOURS
 ORDER BY hour_start DESC, region
 LIMIT 20;
@@ -329,7 +329,7 @@ LIMIT 20;
 
 -- COMMAND ----------
 
-CREATE OR REPLACE VIEW telus_networkperf.gold.v_subscriber_quality_experience AS
+CREATE OR REPLACE VIEW telco_networkperf.gold.v_subscriber_quality_experience AS
 SELECT 
     sub.subscription_type,
     sub.home_location,
@@ -350,7 +350,7 @@ SELECT
     COUNT(DISTINCT CASE WHEN h.health_status = 'Critical' THEN sub.device_id END) AS critical_device_count
 
 FROM aws_ims_shared.ims_data.ims_subscriber_sessions sub
-LEFT JOIN telus_networkperf.gold.gold_device_health h
+LEFT JOIN telco_networkperf.gold.gold_device_health h
     ON sub.device_id = h.device_id
 GROUP BY 
     sub.subscription_type, 
@@ -359,7 +359,7 @@ GROUP BY
     sub.access_technology;
 
 -- Preview subscriber experience
-SELECT * FROM telus_networkperf.gold.v_subscriber_quality_experience
+SELECT * FROM telco_networkperf.gold.v_subscriber_quality_experience
 ORDER BY total_sessions DESC
 LIMIT 20;
 
@@ -390,7 +390,7 @@ SELECT
     SUM(h.critical_event_count_1h) AS total_network_critical_events
 
 FROM aws_ims_shared.ims_data.ims_node_metrics n
-LEFT JOIN telus_networkperf.gold.gold_device_health h
+LEFT JOIN telco_networkperf.gold.gold_device_health h
     ON n.device_id = h.device_id
 GROUP BY n.ims_node_type, n.ims_node_location, n.region
 ORDER BY ims_anomaly_count DESC, avg_error_rate_pct DESC;
@@ -409,15 +409,15 @@ ORDER BY ims_anomaly_count DESC, avg_error_rate_pct DESC;
 -- MAGIC - `aws_ims_shared.ims_data.ims_subscriber_sessions` - Subscriber Analytics
 -- MAGIC 
 -- MAGIC **GCP Gold Tables (Network Performance):**
--- MAGIC - `telus_networkperf.gold.dim_devices` - Device Dimension
--- MAGIC - `telus_networkperf.gold.gold_device_health` - Device Health Status
--- MAGIC - `telus_networkperf.gold.gold_network_events` - Network Events
--- MAGIC - `telus_networkperf.gold.gold_network_performance_5min` - Performance Metrics
+-- MAGIC - `telco_networkperf.gold.dim_devices` - Device Dimension
+-- MAGIC - `telco_networkperf.gold.gold_device_health` - Device Health Status
+-- MAGIC - `telco_networkperf.gold.gold_network_events` - Network Events
+-- MAGIC - `telco_networkperf.gold.gold_network_performance_5min` - Performance Metrics
 -- MAGIC 
 -- MAGIC **New Cross-Cloud Analytics Tables/Views:**
--- MAGIC - `telus_networkperf.gold.gold_ims_call_quality_analysis` - Call Quality + Device Health
--- MAGIC - `telus_networkperf.gold.v_regional_ims_network_kpis` - Regional Dashboard KPIs
--- MAGIC - `telus_networkperf.gold.v_subscriber_quality_experience` - Subscriber QoE Analysis
+-- MAGIC - `telco_networkperf.gold.gold_ims_call_quality_analysis` - Call Quality + Device Health
+-- MAGIC - `telco_networkperf.gold.v_regional_ims_network_kpis` - Regional Dashboard KPIs
+-- MAGIC - `telco_networkperf.gold.v_subscriber_quality_experience` - Subscriber QoE Analysis
 -- MAGIC 
 -- MAGIC ### Join Keys Used
 -- MAGIC | AWS IMS Field | GCP Gold Field | Join Type |
