@@ -449,72 +449,72 @@
     {
       "name": "ds_device_count",
       "displayName": "Total Device Count",
-      "query": "SELECT COUNT(DISTINCT device_id) as total_devices FROM telus_networkperf.gold.gold_device_health"
+      "query": "SELECT COUNT(DISTINCT device_id) as total_devices FROM telco_networkperf.gold.gold_device_health"
     },
     {
       "name": "ds_critical_count",
       "displayName": "Critical Device Count",
-      "query": "SELECT COUNT(*) as critical_devices FROM telus_networkperf.gold.gold_device_health WHERE health_status = 'Critical'"
+      "query": "SELECT COUNT(*) as critical_devices FROM telco_networkperf.gold.gold_device_health WHERE health_status = 'Critical'"
     },
     {
       "name": "ds_avg_health",
       "displayName": "Average Health Score",
-      "query": "SELECT ROUND(AVG(health_score), 1) as avg_health_score FROM telus_networkperf.gold.gold_device_health"
+      "query": "SELECT ROUND(AVG(health_score), 1) as avg_health_score FROM telco_networkperf.gold.gold_device_health"
     },
     {
       "name": "ds_health_distribution",
       "displayName": "Health Status Distribution",
-      "query": "SELECT health_status, COUNT(*) as count FROM telus_networkperf.gold.gold_device_health GROUP BY health_status ORDER BY count DESC"
+      "query": "SELECT health_status, COUNT(*) as count FROM telco_networkperf.gold.gold_device_health GROUP BY health_status ORDER BY count DESC"
     },
     {
       "name": "ds_device_types",
       "displayName": "Device Type Count",
-      "query": "SELECT device_type, COUNT(*) as count FROM telus_networkperf.gold.gold_device_health GROUP BY device_type ORDER BY count DESC"
+      "query": "SELECT device_type, COUNT(*) as count FROM telco_networkperf.gold.gold_device_health GROUP BY device_type ORDER BY count DESC"
     },
     {
       "name": "ds_location_summary",
       "displayName": "Location Summary",
-      "query": "SELECT location, COUNT(*) as devices, ROUND(AVG(health_score), 1) as avg_health, SUM(critical_event_count_1h) as critical_events FROM telus_networkperf.gold.gold_device_health GROUP BY location ORDER BY avg_health ASC"
+      "query": "SELECT location, COUNT(*) as devices, ROUND(AVG(health_score), 1) as avg_health, SUM(critical_event_count_1h) as critical_events FROM telco_networkperf.gold.gold_device_health GROUP BY location ORDER BY avg_health ASC"
     },
     {
       "name": "ds_attention_devices",
       "displayName": "Devices Needing Attention",
-      "query": "SELECT device_id, device_type, location, health_status, health_score, current_latency_ms as latency_ms, current_packet_loss_pct as packet_loss_pct FROM telus_networkperf.gold.gold_device_health WHERE requires_attention = true OR health_status IN ('Critical', 'Poor') ORDER BY health_score ASC LIMIT 50"
+      "query": "SELECT device_id, device_type, location, health_status, health_score, current_latency_ms as latency_ms, current_packet_loss_pct as packet_loss_pct FROM telco_networkperf.gold.gold_device_health WHERE requires_attention = true OR health_status IN ('Critical', 'Poor') ORDER BY health_score ASC LIMIT 50"
     },
     {
       "name": "ds_type_health",
       "displayName": "Device Type by Health",
-      "query": "SELECT device_type, health_status, COUNT(*) as count FROM telus_networkperf.gold.gold_device_health GROUP BY device_type, health_status ORDER BY device_type, health_status"
+      "query": "SELECT device_type, health_status, COUNT(*) as count FROM telco_networkperf.gold.gold_device_health GROUP BY device_type, health_status ORDER BY device_type, health_status"
     },
     {
       "name": "ds_latency_trend",
       "displayName": "Latency Trend",
-      "query": "SELECT window_start, location, ROUND(AVG(avg_value), 2) as avg_latency FROM telus_networkperf.gold.gold_network_performance_5min WHERE metric_name = 'latency_ms' AND window_start >= current_timestamp() - INTERVAL 6 HOURS GROUP BY window_start, location ORDER BY window_start"
+      "query": "SELECT window_start, location, ROUND(AVG(avg_value), 2) as avg_latency FROM telco_networkperf.gold.gold_network_performance_5min WHERE metric_name = 'latency_ms' AND window_start >= current_timestamp() - INTERVAL 6 HOURS GROUP BY window_start, location ORDER BY window_start"
     },
     {
       "name": "ds_packet_loss_trend",
       "displayName": "Packet Loss Trend",
-      "query": "SELECT window_start, device_type, ROUND(AVG(avg_value), 3) as avg_packet_loss FROM telus_networkperf.gold.gold_network_performance_5min WHERE metric_name = 'packet_loss_pct' AND window_start >= current_timestamp() - INTERVAL 6 HOURS GROUP BY window_start, device_type ORDER BY window_start"
+      "query": "SELECT window_start, device_type, ROUND(AVG(avg_value), 3) as avg_packet_loss FROM telco_networkperf.gold.gold_network_performance_5min WHERE metric_name = 'packet_loss_pct' AND window_start >= current_timestamp() - INTERVAL 6 HOURS GROUP BY window_start, device_type ORDER BY window_start"
     },
     {
       "name": "ds_throughput_trend",
       "displayName": "Throughput Trend",
-      "query": "SELECT window_start, location, ROUND(AVG(avg_value), 2) as avg_throughput FROM telus_networkperf.gold.gold_network_performance_5min WHERE metric_name = 'throughput_mbps' AND window_start >= current_timestamp() - INTERVAL 6 HOURS GROUP BY window_start, location ORDER BY window_start"
+      "query": "SELECT window_start, location, ROUND(AVG(avg_value), 2) as avg_throughput FROM telco_networkperf.gold.gold_network_performance_5min WHERE metric_name = 'throughput_mbps' AND window_start >= current_timestamp() - INTERVAL 6 HOURS GROUP BY window_start, location ORDER BY window_start"
     },
     {
       "name": "ds_critical_events",
       "displayName": "Critical Events",
-      "query": "SELECT event_timestamp, device_id, location, severity_name, event_message FROM telus_networkperf.gold.gold_network_events WHERE is_critical = true AND event_timestamp >= current_timestamp() - INTERVAL 24 HOURS ORDER BY event_timestamp DESC LIMIT 100"
+      "query": "SELECT event_timestamp, device_id, location, severity_name, event_message FROM telco_networkperf.gold.gold_network_events WHERE is_critical = true AND event_timestamp >= current_timestamp() - INTERVAL 24 HOURS ORDER BY event_timestamp DESC LIMIT 100"
     },
     {
       "name": "ds_severity_dist",
       "displayName": "Severity Distribution",
-      "query": "SELECT severity_name, COUNT(*) as count FROM telus_networkperf.gold.gold_network_events WHERE event_timestamp >= current_timestamp() - INTERVAL 24 HOURS GROUP BY severity_name ORDER BY count DESC"
+      "query": "SELECT severity_name, COUNT(*) as count FROM telco_networkperf.gold.gold_network_events WHERE event_timestamp >= current_timestamp() - INTERVAL 24 HOURS GROUP BY severity_name ORDER BY count DESC"
     },
     {
       "name": "ds_category_dist",
       "displayName": "Category Distribution",
-      "query": "SELECT event_category, COUNT(*) as count FROM telus_networkperf.gold.gold_network_events WHERE event_timestamp >= current_timestamp() - INTERVAL 24 HOURS GROUP BY event_category ORDER BY count DESC"
+      "query": "SELECT event_category, COUNT(*) as count FROM telco_networkperf.gold.gold_network_events WHERE event_timestamp >= current_timestamp() - INTERVAL 24 HOURS GROUP BY event_category ORDER BY count DESC"
     }
   ]
 }
