@@ -161,32 +161,99 @@ recent_events AS (
   FROM telco_networkperf.gold.gold_network_events
   WHERE event_timestamp >= current_timestamp() - INTERVAL 1 HOUR
   GROUP BY device_id
+),
+scored AS (
+  SELECT
+    p.device_id,
+    p.device_type,
+    p.location,
+    COALESCE(p.current_latency_ms, 0) AS current_latency_ms,
+    COALESCE(p.current_packet_loss_pct, 0) AS current_packet_loss_pct,
+    COALESCE(p.current_throughput_mbps, 0) AS current_throughput_mbps,
+    COALESCE(p.current_jitter_ms, 0) AS current_jitter_ms,
+    COALESCE(p.current_error_rate, 0) AS current_error_rate,
+    COALESCE(e.event_count_1h, 0) AS event_count_1h,
+    COALESCE(e.critical_event_count_1h, 0) AS critical_event_count_1h,
+    LEAST(100, GREATEST(0,
+      100
+      - CASE WHEN COALESCE(p.current_latency_ms, 0) > 150 THEN 30
+             WHEN COALESCE(p.current_latency_ms, 0) > 100 THEN 15
+             WHEN COALESCE(p.current_latency_ms, 0) > 50 THEN 5 ELSE 0 END
+      - CASE WHEN COALESCE(p.current_packet_loss_pct, 0) > 3 THEN 40
+             WHEN COALESCE(p.current_packet_loss_pct, 0) > 1 THEN 20
+             WHEN COALESCE(p.current_packet_loss_pct, 0) > 0.5 THEN 10 ELSE 0 END
+      - CASE WHEN COALESCE(p.current_jitter_ms, 0) > 40 THEN 20
+             WHEN COALESCE(p.current_jitter_ms, 0) > 20 THEN 10 ELSE 0 END
+      - CASE WHEN COALESCE(e.critical_event_count_1h, 0) > 10 THEN 30
+             WHEN COALESCE(e.critical_event_count_1h, 0) > 5 THEN 15
+             WHEN COALESCE(e.critical_event_count_1h, 0) > 0 THEN 5 ELSE 0 END
+    )) AS health_score
+  FROM pivoted p
+  LEFT JOIN recent_events e ON p.device_id = e.device_id
 )
 SELECT
-  p.device_id,
-  p.device_type,
-  p.location,
-  COALESCE(p.current_latency_ms, 0) AS current_latency_ms,
-  COALESCE(p.current_packet_loss_pct, 0) AS current_packet_loss_pct,
-  COALESCE(p.current_throughput_mbps, 0) AS current_throughput_mbps,
-  COALESCE(p.current_jitter_ms, 0) AS current_jitter_ms,
-  COALESCE(p.current_error_rate, 0) AS current_error_rate,
-  COALESCE(e.event_count_1h, 0) AS event_count_1h,
-  COALESCE(e.critical_event_count_1h, 0) AS critical_event_count_1h,
-  LEAST(100, GREATEST(0,
-    100
-    - CASE WHEN COALESCE(p.current_latency_ms, 0) > 150 THEN 30
-           WHEN COALESCE(p.current_latency_ms, 0) > 100 THEN 15
-           WHEN COALESCE(p.current_latency_ms, 0) > 50 THEN 5 ELSE 0 END
-    - CASE WHEN COALESCE(p.current_packet_loss_pct, 0) > 3 THEN 40
-           WHEN COALESCE(p.current_packet_loss_pct, 0) > 1 THEN 20
-           WHEN COALESCE(p.current_packet_loss_pct, 0) > 0.5 THEN 10 ELSE 0 END
-    - CASE WHEN COALESCE(p.current_jitter_ms, 0) > 40 THEN 20
-           WHEN COALESCE(p.current_jitter_ms, 0) > 20 THEN 10 ELSE 0 END
-    - CASE WHEN COALESCE(e.critical_event_count_1h, 0) > 10 THEN 30
-           WHEN COALESCE(e.critical_event_count_1h, 0) > 5 THEN 15
-           WHEN COALESCE(e.critical_event_count_1h, 0) > 0 THEN 5 ELSE 0 END
-  )) AS health_score,
+  device_id,
+  device_type,
+  location,
+  current_latency_ms,
+  current_packet_loss_pct,
+  current_throughput_mbps,
+  current_jitter_ms,
+  current_error_rate,
+  event_count_1h,
+  critical_event_count_1h,
+  health_score,
+  CASE
+    WHEN health_score >= 90 THEN 'Excellent'
+    WHEN health_score >= 75 THEN 'Good'
+    WHEN health_score >= 50 THEN 'Fair'
+    WHEN health_score >= 25 THEN 'Poor'
+    ELSE 'Critical'
+  END AS health_status,
+  (health_score < 50 OR critical_event_count_1h > 0) AS requires_attention,
   current_timestamp() AS processed_timestamp
-FROM pivoted p
-LEFT JOIN recent_events e ON p.device_id = e.device_id;
+FROM scored;
+
+
+CREATE OR REFRESH MATERIALIZED VIEW telco_networkperf.gold.gold_kpi_hourly
+COMMENT 'Hourly aggregated network KPIs for executive dashboards'
+TBLPROPERTIES (
+  'quality' = 'gold',
+  'pipelines.autoOptimize.managed' = 'true'
+)
+AS
+WITH hourly_perf AS (
+  SELECT
+    DATE_TRUNC('hour', window_start) AS hour_start,
+    metric_name,
+    COUNT(device_id) AS device_count,
+    AVG(avg_value) AS hourly_avg,
+    MAX(max_value) AS hourly_max,
+    AVG(p95_value) AS hourly_p95,
+    SUM(anomaly_count) AS hourly_anomalies
+  FROM telco_networkperf.gold.gold_network_performance_5min
+  GROUP BY DATE_TRUNC('hour', window_start), metric_name
+),
+hourly_events AS (
+  SELECT
+    DATE_TRUNC('hour', event_timestamp) AS hour_start,
+    COUNT(*) AS total_events,
+    SUM(CASE WHEN is_critical THEN 1 ELSE 0 END) AS critical_events,
+    COUNT(DISTINCT device_id) AS affected_devices
+  FROM telco_networkperf.gold.gold_network_events
+  GROUP BY DATE_TRUNC('hour', event_timestamp)
+)
+SELECT
+  p.hour_start,
+  p.metric_name,
+  p.device_count,
+  p.hourly_avg,
+  p.hourly_max,
+  p.hourly_p95,
+  p.hourly_anomalies,
+  COALESCE(e.total_events, 0) AS total_events,
+  COALESCE(e.critical_events, 0) AS critical_events,
+  COALESCE(e.affected_devices, 0) AS affected_devices,
+  current_timestamp() AS processed_timestamp
+FROM hourly_perf p
+LEFT JOIN hourly_events e ON p.hour_start = e.hour_start;
